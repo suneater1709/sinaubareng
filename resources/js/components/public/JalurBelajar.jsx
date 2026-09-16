@@ -36,8 +36,12 @@ export default function JalurBelajar({ onNavigate }) {
                 {/* Right Image/Visual */}
                 <div className="relative flex justify-center lg:justify-end">
                     <div className="w-full max-w-md bg-white border border-outline-variant/30 rounded-3xl p-4 shadow-xl relative z-10">
-                        <div className="w-full h-[350px] bg-surface-container rounded-2xl flex items-center justify-center mb-4 overflow-hidden">
-                            <img src="https://images.unsplash.com/photo-1543269664-56d5d5616f5a?q=80&w=2070&auto=format&fit=crop" alt="Learning" className="w-full h-full object-cover" />
+                        <div className="w-full h-[350px] bg-surface-container rounded-2xl flex items-center justify-center mb-4 overflow-hidden relative">
+                            <img 
+                                src="https://images.unsplash.com/photo-1577896851231-70ef18881754?q=80&w=2070&auto=format&fit=crop" 
+                                alt="Belajar Siswa" 
+                                className="w-full h-full object-cover" 
+                            />
                         </div>
                         <div className="absolute -bottom-6 left-12 bg-white rounded-2xl p-4 shadow-lg border border-outline-variant/20 flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-orange/10 flex items-center justify-center">

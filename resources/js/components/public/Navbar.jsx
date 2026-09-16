@@ -1,4 +1,5 @@
 import React from 'react';
+import Logo from '../Logo';
 
 export default function Navbar({ currentRoute, onNavigate }) {
     const navLinks = [
@@ -13,11 +14,10 @@ export default function Navbar({ currentRoute, onNavigate }) {
             <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
                 {/* Logo */}
                 <div 
-                    className="flex items-center gap-2.5 cursor-pointer"
+                    className="cursor-pointer"
                     onClick={() => onNavigate('beranda')}
                 >
-                    <img src="/favicon.ico" alt="stugether" className="w-8 h-8 rounded-lg object-contain shadow-sm" />
-                    <span className="font-extrabold text-on-surface text-2xl tracking-tight font-sans">stugether</span>
+                    <Logo size="md" />
                 </div>
 
                 {/* Center Links */}
