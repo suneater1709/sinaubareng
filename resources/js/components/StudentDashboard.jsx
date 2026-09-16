@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../utils/api';
+import Logo from './Logo';
 import ChatDrawer from './ChatDrawer';
 import NotificationDropdown from './NotificationDropdown';
 import { 
@@ -342,12 +343,8 @@ export default function StudentDashboard({ user = {}, onNavigate, onLogout, show
             <aside className="w-full lg:w-64 bg-white lg:border-r border-slate-100 p-6 flex flex-col justify-between text-left h-full overflow-y-auto no-scrollbar shrink-0 z-10">
                 <div>
                     {/* Logo Section */}
-                    <div className="flex items-center gap-3 mb-10 cursor-pointer" onClick={() => onNavigate('beranda')}>
-                        <img src="/favicon.ico" alt="stugether" className="w-9 h-9 rounded-xl object-contain shadow-sm" />
-                        <div className="text-left">
-                            <span className="font-extrabold text-navy text-lg block leading-none tracking-tight">stugether</span>
-                            <span className="text-[10px] text-slate-400 font-bold tracking-wider block mt-1 uppercase">Siswa ({user.jenjang || 'SD'})</span>
-                        </div>
+                    <div className="mb-10 cursor-pointer" onClick={() => onNavigate('beranda')}>
+                        <Logo size="lg" subtitle={`Siswa (${user.jenjang || 'SD'})`} />
                     </div>
 
                     {/* Navigation list */}

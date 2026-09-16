@@ -1,4 +1,5 @@
 import React from 'react';
+import Logo from '../Logo';
 
 export default function Footer({ onNavigate }) {
     return (
@@ -6,9 +7,8 @@ export default function Footer({ onNavigate }) {
             <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
                 {/* Column 1: Brand */}
                 <div className="flex flex-col gap-4">
-                    <div className="flex items-center gap-2.5">
-                        <img src="/favicon.ico" alt="stugether" className="w-8 h-8 rounded-lg object-contain shadow-sm" />
-                        <span className="font-extrabold text-2xl tracking-tight text-navy">stugether</span>
+                    <div className="cursor-pointer" onClick={() => onNavigate('beranda')}>
+                        <Logo size="md" textColor="text-navy" />
                     </div>
                     <p className="text-sm text-on-surface-variant leading-relaxed">
                         Bimbingan belajar profesional & syar'i untuk masa depan cerah anak Anda.

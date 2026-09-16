@@ -35,13 +35,23 @@ export default function App() {
     // Fetch fresh profile on load if token exists
     useEffect(() => {
         const checkSession = async () => {
-            if (user) {
+            const token = localStorage.getItem('sinaubareng_token');
+            if (token && user) {
                 try {
                     const freshUser = await api.get('/me');
-                    setCurrentUser(freshUser);
-                    setUser(freshUser);
+                    if (freshUser && freshUser.id) {
+                        setCurrentUser(freshUser);
+                        setUser(freshUser);
+                    } else {
+                        setToken(null);
+                        setUser(null);
+                        setCurrentUser(null);
+                    }
                 } catch (err) {
-                    console.error('Session validation failed:', err);
+                    console.warn('Session check reset:', err.message);
+                    setToken(null);
+                    setUser(null);
+                    setCurrentUser(null);
                 }
             }
         };

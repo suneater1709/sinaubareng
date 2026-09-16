@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../utils/api';
+import Logo from './Logo';
 import ChatDrawer from './ChatDrawer';
 import NotificationDropdown from './NotificationDropdown';
 import { 
@@ -227,13 +228,7 @@ export default function AdminPage({ onLogout, user }) {
                 <div>
                     {/* Standardized Universal Logo */}
                     <div className="h-24 flex items-center px-8 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
-                        <div className="flex items-center gap-3">
-                            <img src="/favicon.ico" alt="stugether" className="w-10 h-10 object-contain rounded-xl shadow-sm bg-white p-1" />
-                            <div className="flex flex-col text-left">
-                                <span className="font-extrabold tracking-tight text-xl text-navy leading-none">stugether</span>
-                                <span className="font-bold tracking-wider text-[9px] uppercase text-[#0f5c50] mt-1">Admin Panel</span>
-                            </div>
-                        </div>
+                        <Logo size="lg" subtitle="Admin Panel" />
                     </div>
 
                     {/* Navigation Menu */}

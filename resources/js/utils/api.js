@@ -49,10 +49,12 @@ async function request(endpoint, options = {}) {
         headers,
     });
 
-    if (response.status === 401) {
+    if (response.status === 401 || (response.status >= 400 && endpoint === '/me')) {
         setToken(null);
         setUser(null);
-        window.dispatchEvent(new Event('auth_failed'));
+        if (response.status === 401) {
+            window.dispatchEvent(new Event('auth_failed'));
+        }
     }
 
     const data = await response.json().catch(() => null);
