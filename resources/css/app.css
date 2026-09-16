@@ -1,0 +1,95 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@theme {
+    --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    --color-surface: #fbf8ff;
+    --color-surface-dim: #d5d7ff;
+    --color-surface-bright: #fbf8ff;
+    --color-surface-container-lowest: #ffffff;
+    --color-surface-container-low: #f4f2ff;
+    --color-surface-container: #edecff;
+    --color-surface-container-high: #e7e6ff;
+    --color-surface-container-highest: #e0e0ff;
+    --color-on-surface: #161938;
+    --color-on-surface-variant: #3e4946;
+    --color-inverse-surface: #2b2e4e;
+    --color-inverse-on-surface: #f1efff;
+    --color-outline: #6f7976;
+    --color-outline-variant: #bec9c5;
+    --color-surface-tint: #086a5f;
+    --color-primary: #00544b;
+    --color-on-primary: #ffffff;
+    --color-primary-container: #116e63;
+    --color-on-primary-container: #9deddf;
+    --color-inverse-primary: #85d5c7;
+    --color-secondary: #845400;
+    --color-on-secondary: #ffffff;
+    --color-secondary-container: #ffad34;
+    --color-on-secondary-container: #6d4400;
+    --color-tertiary: #442ebd;
+    --color-on-tertiary: #ffffff;
+    --color-tertiary-container: #5c4bd6;
+    --color-on-tertiary-container: #e0daff;
+    --color-error: #ba1a1a;
+    --color-on-error: #ffffff;
+    --color-error-container: #ffdad6;
+    --color-on-error-container: #93000a;
+    --color-primary-fixed: #a1f1e3;
+    --color-primary-fixed-dim: #85d5c7;
+    --color-on-primary-fixed: #00201c;
+    --color-on-primary-fixed-variant: #005048;
+    --color-secondary-fixed: #ffddb6;
+    --color-secondary-fixed-dim: #ffb95b;
+    --color-on-secondary-fixed: #2a1800;
+    --color-on-secondary-fixed-variant: #643f00;
+    --color-tertiary-fixed: #e4dfff;
+    --color-tertiary-fixed-dim: #c6bfff;
+    --color-on-tertiary-fixed: #160066;
+    --color-on-tertiary-fixed-variant: #4029ba;
+    --color-background: #fbf8ff;
+    --color-on-background: #161938;
+    --color-surface-variant: #e0e0ff;
+    
+    --color-navy: #0D102F;
+    --color-teal: #116E63;
+    --color-orange: #F2A227;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(-1deg); }
+  50% { transform: translateY(-8px) rotate(1deg); }
+}
+
+@keyframes float-reverse {
+  0%, 100% { transform: translateY(0px) rotate(1deg); }
+  50% { transform: translateY(8px) rotate(-1deg); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: float-reverse 7s ease-in-out infinite;
+}
+
+/* Hide scrollbars cross-browser while keeping scrolling functional */
+html, body, .scroll-container, .no-scrollbar {
+  scrollbar-width: none;      /* Firefox */
+  -ms-overflow-style: none;   /* IE/Edge */
+}
+
+::-webkit-scrollbar,
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+.scroll-container::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;   /* Chrome, Safari, Edge */
+  width: 0px !important;
+  height: 0px !important;
+}
+
