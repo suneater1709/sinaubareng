@@ -1,30 +1,72 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../utils/api';
+import ChatDrawer from './ChatDrawer';
+import NotificationDropdown from './NotificationDropdown';
 import { 
     Users, UserPlus, LogOut, Check, X, Key, Search, Activity, BookOpen, Users2, Shield,
-    LayoutDashboard, Settings, Bell, Calendar, TrendingUp, UserCheck, UserX, SlidersHorizontal, Plus, Edit2, Ban, GraduationCap, Clock, MoreVertical, Eye, EyeOff, Info, User, Mail, Lock, Star, History, LogIn, ChevronRight
+    LayoutDashboard, Settings, Bell, Calendar, TrendingUp, UserCheck, UserX, SlidersHorizontal, Plus, Edit2, Ban, GraduationCap, Clock, MoreVertical, Eye, EyeOff, Info, User, Mail, Lock, Star, History, LogIn, ChevronRight, BarChart3, Video, Link, MessageSquare, CheckCircle2, AlertCircle, FileText, Globe
 } from 'lucide-react';
 
 export default function AdminPage({ onLogout, user }) {
-    const [activeTab, setActiveTab] = useState('dashboard');
-    const [stats, setStats] = useState({ siswa_count: 0, guru_active_count: 0, guru_inactive_count: 0 });
+    const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'guru' | 'laporan' | 'sesi' | 'pengaturan'
+    const [stats, setStats] = useState({ siswa_count: 0, guru_active_count: 0, guru_inactive_count: 0, sessions_scheduled_count: 0, sessions_completed_count: 0 });
     const [gurus, setGurus] = useState([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
     
-    // Form state for creating/editing
+    // Form state for creating/editing Guru
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editGuru, setEditGuru] = useState(null);
     const [formData, setFormData] = useState({ name: '', email: '', password: '', old_password: '', jenjang: 'SD' });
     const [formLoading, setFormLoading] = useState(false);
 
+    // Modal state for Tambah Sesi
+    const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
+    const [sessionFormData, setSessionFormData] = useState({
+        guru_id: '',
+        jenjang: 'SD',
+        judul: '',
+        deskripsi: '',
+        waktu_mulai: '',
+        waktu_selesai: '',
+        link_meeting: '',
+    });
+    const [sessionLoading, setSessionLoading] = useState(false);
+    const [sessionsList, setSessionsList] = useState([]);
+
+    // Reports state
+    const [reportsData, setReportsData] = useState(null);
+    const [reportFilter, setReportFilter] = useState({ range: 'monthly', jenjang: '', guru_id: '' });
+    const [loadingReports, setLoadingReports] = useState(false);
+
+    // Site settings state
+    const [siteSettings, setSiteSettings] = useState({
+        hero_title: '',
+        hero_subtitle: '',
+        hero_image_url: '',
+        active_students_badge: '500+',
+    });
+    const [savingSettings, setSavingSettings] = useState(false);
+
+    // Drawer / Modal states for Notifications & Messages
+    const [isChatOpen, setIsChatOpen] = useState(false);
+    const [isNotifOpen, setIsNotifOpen] = useState(false);
+
     useEffect(() => {
         if (activeTab === 'dashboard') {
             fetchStats();
+            fetchGurus();
         } else if (activeTab === 'guru') {
             fetchGurus();
+        } else if (activeTab === 'laporan') {
+            fetchReports();
+        } else if (activeTab === 'sesi') {
+            fetchSessions();
+            fetchGurus();
+        } else if (activeTab === 'pengaturan') {
+            fetchSettings();
         }
-    }, [activeTab, search]);
+    }, [activeTab, search, reportFilter]);
 
     const fetchStats = async () => {
         try {
@@ -39,11 +81,51 @@ export default function AdminPage({ onLogout, user }) {
         setLoading(true);
         try {
             const data = await api.get(`/admin/guru${search ? `?search=${search}` : ''}`);
-            setGurus(data);
+            setGurus(data || []);
+            if (data.length > 0 && !sessionFormData.guru_id) {
+                setSessionFormData(prev => ({ ...prev, guru_id: data[0].id }));
+            }
         } catch (error) {
             console.error('Failed to fetch gurus', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchReports = async () => {
+        setLoadingReports(true);
+        try {
+            const params = new URLSearchParams();
+            if (reportFilter.range) params.append('range', reportFilter.range);
+            if (reportFilter.jenjang) params.append('jenjang', reportFilter.jenjang);
+            if (reportFilter.guru_id) params.append('guru_id', reportFilter.guru_id);
+
+            const data = await api.get(`/admin/reports?${params.toString()}`);
+            setReportsData(data);
+        } catch (error) {
+            console.error('Failed to fetch reports', error);
+        } finally {
+            setLoadingReports(false);
+        }
+    };
+
+    const fetchSessions = async () => {
+        try {
+            const data = await api.get('/admin/sessions');
+            setSessionsList(data || []);
+        } catch (error) {
+            console.error('Failed to fetch sessions', error);
+        }
+    };
+
+    const fetchSettings = async () => {
+        try {
+            const data = await api.get('/admin/settings');
+            if (data) {
+                setSiteSettings(prev => ({ ...prev, ...data }));
+            }
+        } catch (error) {
+            console.error('Failed to fetch site settings', error);
         }
     };
 
@@ -54,15 +136,6 @@ export default function AdminPage({ onLogout, user }) {
             fetchStats();
         } catch (error) {
             alert('Gagal mengubah status guru.');
-        }
-    };
-
-    const handleResetPassword = async (guruId) => {
-        try {
-            await api.post(`/admin/guru/${guruId}/reset-password`);
-            alert('Email reset password berhasil dikirim (simulasi).');
-        } catch (error) {
-            alert('Gagal mengirim email reset password.');
         }
     };
 
@@ -95,6 +168,45 @@ export default function AdminPage({ onLogout, user }) {
         }
     };
 
+    const handleCreateSession = async (e) => {
+        e.preventDefault();
+        setSessionLoading(true);
+        try {
+            await api.post('/admin/sessions', sessionFormData);
+            alert('Sesi belajar berhasil dijadwalkan!');
+            setIsSessionModalOpen(false);
+            setSessionFormData({
+                guru_id: gurus[0]?.id || '',
+                jenjang: 'SD',
+                judul: '',
+                deskripsi: '',
+                waktu_mulai: '',
+                waktu_selesai: '',
+                link_meeting: '',
+            });
+            fetchSessions();
+            fetchStats();
+            if (activeTab === 'laporan') fetchReports();
+        } catch (error) {
+            alert('Gagal menjadwalkan sesi: ' + error.message);
+        } finally {
+            setSessionLoading(false);
+        }
+    };
+
+    const handleSaveSettings = async (e) => {
+        e.preventDefault();
+        setSavingSettings(true);
+        try {
+            await api.post('/admin/settings', siteSettings);
+            alert('Pengaturan landing page berhasil disimpan!');
+        } catch (error) {
+            alert('Gagal menyimpan pengaturan: ' + error.message);
+        } finally {
+            setSavingSettings(false);
+        }
+    };
+
     const openCreateForm = () => {
         setEditGuru(null);
         setFormData({ name: '', email: '', password: '', old_password: '', jenjang: 'SD' });
@@ -108,542 +220,493 @@ export default function AdminPage({ onLogout, user }) {
     };
 
     return (
-        <div className="w-full h-screen flex overflow-hidden bg-[#fafbfd]">
-            {/* Sidebar (Fixed / Sticky Viewport) */}
-            <aside className="w-64 h-screen bg-[#f5f7fa] border-r border-slate-100 flex flex-col hidden md:flex shrink-0 sticky top-0 pb-6 z-20 overflow-y-auto no-scrollbar justify-between">
-                <div className="h-24 flex items-center px-8">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-[#0f5c50] p-2 flex items-center justify-center shadow-sm">
-                            <GraduationCap className="text-white" size={24} />
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="font-bold tracking-tight text-lg text-[#0f5c50] leading-tight">gether</span>
-                            <span className="font-medium tracking-wider text-[8px] uppercase text-slate-500">Admin Studies</span>
+        <div className="w-full h-screen flex overflow-hidden bg-[#fafbfc]">
+            
+            {/* Sidebar Navigation */}
+            <aside className="w-64 h-screen bg-white border-r border-slate-100 flex flex-col hidden md:flex shrink-0 sticky top-0 pb-6 z-20 overflow-y-auto no-scrollbar justify-between">
+                <div>
+                    {/* Standardized Universal Logo */}
+                    <div className="h-24 flex items-center px-8 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
+                        <div className="flex items-center gap-3">
+                            <img src="/favicon.ico" alt="stugether" className="w-10 h-10 object-contain rounded-xl shadow-sm bg-white p-1" />
+                            <div className="flex flex-col text-left">
+                                <span className="font-extrabold tracking-tight text-xl text-navy leading-none">stugether</span>
+                                <span className="font-bold tracking-wider text-[9px] uppercase text-[#0f5c50] mt-1">Admin Panel</span>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div className="flex-1 py-4 flex flex-col gap-1">
-                    <div className="px-4">
+                    {/* Navigation Menu */}
+                    <div className="py-2 flex flex-col gap-1.5 px-4">
                         <button
                             onClick={() => { setActiveTab('dashboard'); setIsFormOpen(false); }}
-                            className={`w-full text-left px-4 py-3.5 rounded-r-xl text-sm font-medium flex items-center gap-3 transition-all relative ${
+                            className={`w-full text-left px-4 py-3.5 rounded-2xl text-xs font-bold flex items-center gap-3 transition-all cursor-pointer ${
                                 activeTab === 'dashboard' 
-                                    ? 'bg-[#eaeef3] text-navy' 
-                                    : 'text-slate-500 hover:bg-[#eaeef3]/50 hover:text-slate-700'
+                                    ? 'bg-[#f0fbf9] text-[#0f5c50] shadow-sm' 
+                                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
                             }`}
                         >
-                            {activeTab === 'dashboard' && <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#0f5c50] rounded-r-full"></div>}
-                            <LayoutDashboard size={18} /> Ringkasan
+                            <LayoutDashboard size={18} /> Dashboard Ringkasan
                         </button>
-                    </div>
-                    
-                    <div className="px-4">
+                        
+                        <button
+                            onClick={() => { setActiveTab('laporan'); setIsFormOpen(false); }}
+                            className={`w-full text-left px-4 py-3.5 rounded-2xl text-xs font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                                activeTab === 'laporan' 
+                                    ? 'bg-[#f0fbf9] text-[#0f5c50] shadow-sm' 
+                                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                            }`}
+                        >
+                            <BarChart3 size={18} /> Laporan & Statistik
+                        </button>
+
                         <button
                             onClick={() => { setActiveTab('guru'); setIsFormOpen(false); }}
-                            className={`w-full text-left px-4 py-3.5 rounded-r-xl text-sm font-medium flex items-center gap-3 transition-all relative ${
+                            className={`w-full text-left px-4 py-3.5 rounded-2xl text-xs font-bold flex items-center gap-3 transition-all cursor-pointer ${
                                 activeTab === 'guru' 
-                                    ? 'bg-[#eaeef3] text-navy' 
-                                    : 'text-slate-500 hover:bg-[#eaeef3]/50 hover:text-slate-700'
+                                    ? 'bg-[#f0fbf9] text-[#0f5c50] shadow-sm' 
+                                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
                             }`}
                         >
-                            {activeTab === 'guru' && <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#0f5c50] rounded-r-full"></div>}
                             <Users size={18} /> Manajemen Guru
                         </button>
-                    </div>
 
-                    <div className="px-4 mt-1">
                         <button
-                            onClick={() => { setActiveTab('kurikulum'); setIsFormOpen(false); }}
-                            className={`w-full text-left px-4 py-3.5 rounded-r-xl text-sm font-medium flex items-center gap-3 transition-all relative ${
-                                activeTab === 'kurikulum' 
-                                    ? 'bg-[#eaeef3] text-navy' 
-                                    : 'text-slate-500 hover:bg-[#eaeef3]/50 hover:text-slate-700'
+                            onClick={() => { setActiveTab('sesi'); setIsFormOpen(false); }}
+                            className={`w-full text-left px-4 py-3.5 rounded-2xl text-xs font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                                activeTab === 'sesi' 
+                                    ? 'bg-[#f0fbf9] text-[#0f5c50] shadow-sm' 
+                                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
                             }`}
                         >
-                            {activeTab === 'kurikulum' && <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#0f5c50] rounded-r-full"></div>}
-                            <BookOpen size={18} /> Kurikulum
+                            <Calendar size={18} /> Jadwal Sesi Belajar
+                        </button>
+
+                        <button
+                            onClick={() => { setActiveTab('pengaturan'); setIsFormOpen(false); }}
+                            className={`w-full text-left px-4 py-3.5 rounded-2xl text-xs font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                                activeTab === 'pengaturan' 
+                                    ? 'bg-[#f0fbf9] text-[#0f5c50] shadow-sm' 
+                                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                            }`}
+                        >
+                            <Globe size={18} /> Pengaturan Landing
                         </button>
                     </div>
                 </div>
 
+                {/* Single Consolidated Action Button */}
                 <div className="px-6 mt-auto">
-                    <button className="w-full py-3.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md">
-                        <Plus size={16} /> Tambah Sesi
+                    <button 
+                        onClick={() => setIsSessionModalOpen(true)}
+                        className="w-full py-3.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white font-bold rounded-2xl text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-[#0f5c50]/20"
+                    >
+                        <Plus size={16} /> Tambah Sesi Belajar
                     </button>
                 </div>
             </aside>
 
-            {/* Main Content */}
+            {/* Main Content Area */}
             <main className="flex-1 h-screen flex flex-col min-w-0 overflow-y-auto no-scrollbar relative">
-                <header className="h-24 bg-[#fafbfd] flex items-center justify-between px-10 sticky top-0 z-10">
+                
+                {/* Header Navbar */}
+                <header className="h-24 bg-[#fafbfc] flex items-center justify-between px-8 sm:px-10 sticky top-0 z-10 border-b border-slate-100/80 backdrop-blur-md">
                     <div className="relative flex-1 max-w-md hidden md:block">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                         <input 
                             type="text" 
-                            placeholder="Cari data..." 
-                            className="w-full pl-11 pr-4 py-3 bg-[#f5f7fa] rounded-full text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all"
+                            placeholder="Cari data di sistem stugether..." 
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200/80 rounded-full text-xs text-slate-700 focus:outline-none focus:border-[#0f5c50] transition-all shadow-sm"
                         />
                     </div>
-                    <div className="flex items-center gap-6 ml-auto">
-                        <button className="text-slate-600 hover:text-navy transition-colors relative cursor-pointer">
-                            <Bell size={20} />
-                            <span className="absolute 1 w-2 h-2 bg-rose-500 rounded-full border border-[#fafbfd]"></span>
+
+                    <div className="flex items-center gap-5 ml-auto relative">
+                        {/* Messages Button */}
+                        <button 
+                            onClick={() => setIsChatOpen(true)}
+                            className="w-10 h-10 rounded-full bg-white border border-slate-200/80 text-slate-600 hover:text-[#0f5c50] hover:border-[#0f5c50] flex items-center justify-center transition-colors cursor-pointer shadow-sm relative"
+                            title="Pusat Pesan"
+                        >
+                            <Mail size={18} />
                         </button>
-                        <button className="text-slate-600 hover:text-navy transition-colors cursor-pointer">
-                            <Settings size={20} />
-                        </button>
+
+                        {/* Notifications Button */}
+                        <div className="relative">
+                            <button 
+                                onClick={() => setIsNotifOpen(!isNotifOpen)}
+                                className="w-10 h-10 rounded-full bg-white border border-slate-200/80 text-slate-600 hover:text-[#0f5c50] hover:border-[#0f5c50] flex items-center justify-center transition-colors cursor-pointer shadow-sm relative"
+                                title="Notifikasi"
+                            >
+                                <Bell size={18} />
+                                <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full animate-ping"></span>
+                                <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full"></span>
+                            </button>
+
+                            <NotificationDropdown 
+                                isOpen={isNotifOpen} 
+                                onClose={() => setIsNotifOpen(false)}
+                                onOpenChat={() => setIsChatOpen(true)}
+                            />
+                        </div>
+
                         <div className="w-px h-6 bg-slate-200"></div>
-                        <button className="flex items-center gap-3 text-left cursor-pointer group" onClick={onLogout}>
+
+                        {/* Profile Pill & Logout */}
+                        <div className="flex items-center gap-3 text-left">
                             <div className="hidden sm:block">
-                                <h4 className="text-xs font-bold text-navy group-hover:text-primary transition-colors">Super Admin</h4>
-                                <p className="text-[10px] text-slate-500">Administrator</p>
+                                <h4 className="text-xs font-bold text-navy">{user?.name || 'Administrator'}</h4>
+                                <p className="text-[10px] text-[#0f5c50] font-semibold">Super Admin</p>
                             </div>
-                            <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white overflow-hidden shadow-sm">
-                                <img src="https://i.pravatar.cc/150?img=11" alt="Admin" />
+                            <div className="w-10 h-10 rounded-full bg-[#161938] text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                                AD
                             </div>
-                        </button>
+                            <button 
+                                onClick={onLogout}
+                                className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
+                                title="Keluar"
+                            >
+                                <LogOut size={16} />
+                            </button>
+                        </div>
                     </div>
                 </header>
 
+                {/* Body Content */}
                 <div className="flex-1 p-6 lg:p-8 overflow-y-auto no-scrollbar pb-24">
-                    {isFormOpen ? (
-                        <div className="max-w-4xl mx-auto">
-                            <div className="flex flex-col lg:flex-row gap-6">
-                                {/* Left side: Form */}
-                                <div className="flex-1 bg-white border border-slate-200/80 p-8 rounded-3xl shadow-sm">
-                                    <div className="flex justify-between items-start mb-8">
-                                        <div>
-                                            <h2 className="text-2xl font-bold text-navy mb-1 tracking-tight">
-                                                {editGuru ? 'Edit Akun Guru' : 'Buat Akun Guru Baru'}
-                                            </h2>
-                                            <p className="text-sm text-slate-500">Perbarui informasi profil, jenjang ajar, dan keamanan akun pengajar.</p>
-                                        </div>
-                                        <div className="w-12 h-12 rounded-2xl bg-[#a7f3d0] flex items-center justify-center text-[#0f5c50]">
-                                            <UserPlus size={24} />
-                                        </div>
-                                    </div>
-                                    
-                                    <form onSubmit={handleSubmitForm}>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                                            {/* Column 1: Informasi Dasar */}
-                                            <div className="flex flex-col gap-6">
-                                                <h3 className="text-[11px] font-bold text-[#1b7668] uppercase tracking-widest mb-2">Informasi Dasar</h3>
-                                                
-                                                <div>
-                                                    <label className="text-xs font-bold text-navy block mb-2">Nama Lengkap <span className="text-rose-500">*</span></label>
-                                                    <div className="relative">
-                                                        <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400">
-                                                            <User size={16} />
-                                                        </span>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.name}
-                                                            onChange={e => setFormData({...formData, name: e.target.value})}
-                                                            className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                                                            required
-                                                        />
-                                                    </div>
-                                                </div>
-                                                
-                                                <div>
-                                                    <label className="text-xs font-bold text-navy block mb-2">Email <span className="text-rose-500">*</span></label>
-                                                    <div className="relative">
-                                                        <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400">
-                                                            <Mail size={16} />
-                                                        </span>
-                                                        <input 
-                                                            type="email" 
-                                                            value={formData.email}
-                                                            onChange={e => setFormData({...formData, email: e.target.value})}
-                                                            className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                                                            required
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div>
-                                                    <label className="text-xs font-bold text-navy block mb-2">Jenjang Ajar <span className="text-rose-500">*</span></label>
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        <label className={`flex items-center justify-center gap-2 p-3.5 border rounded-xl cursor-pointer text-xs font-bold transition-all ${
-                                                            formData.jenjang === 'SD'
-                                                                ? 'border-[#0f5c50] bg-[#e6f7f4] text-[#0f5c50] shadow-sm'
-                                                                : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                                                        }`}>
-                                                            <input
-                                                                type="radio"
-                                                                name="jenjang"
-                                                                value="SD"
-                                                                checked={formData.jenjang === 'SD'}
-                                                                onChange={e => setFormData({ ...formData, jenjang: e.target.value })}
-                                                                className="hidden"
-                                                            />
-                                                            <span className="w-2.5 h-2.5 rounded-full bg-current"></span>
-                                                            Guru SD
-                                                        </label>
-                                                        <label className={`flex items-center justify-center gap-2 p-3.5 border rounded-xl cursor-pointer text-xs font-bold transition-all ${
-                                                            formData.jenjang === 'SMP'
-                                                                ? 'border-[#0f5c50] bg-[#e6f7f4] text-[#0f5c50] shadow-sm'
-                                                                : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                                                        }`}>
-                                                            <input
-                                                                type="radio"
-                                                                name="jenjang"
-                                                                value="SMP"
-                                                                checked={formData.jenjang === 'SMP'}
-                                                                onChange={e => setFormData({ ...formData, jenjang: e.target.value })}
-                                                                className="hidden"
-                                                            />
-                                                            <span className="w-2.5 h-2.5 rounded-full bg-current"></span>
-                                                            Guru SMP
-                                                        </label>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Column 2: Keamanan Akun */}
-                                            <div className="flex flex-col gap-6">
-                                                <h3 className="text-[11px] font-bold text-[#1b7668] uppercase tracking-widest mb-2">Keamanan Akun</h3>
-                                                
-                                                {editGuru ? (
-                                                    <>
-                                                        <div>
-                                                            <label className="text-xs font-bold text-navy block mb-2">Password Lama</label>
-                                                            <div className="relative">
-                                                                <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400">
-                                                                    <Lock size={16} />
-                                                                </span>
-                                                                <input 
-                                                                    type="password" 
-                                                                    value={formData.old_password || ''}
-                                                                    onChange={e => setFormData({...formData, old_password: e.target.value})}
-                                                                    className="w-full pl-11 pr-10 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                                                                    placeholder="••••••••"
-                                                                />
-                                                                <span className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 cursor-pointer hover:text-navy">
-                                                                    <Eye size={16} />
-                                                                </span>
-                                                            </div>
-                                                            <p className="text-[10px] italic text-slate-500 mt-2">Kosongkan jika tidak ingin mengubah password.</p>
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-xs font-bold text-navy block mb-2">Password Baru</label>
-                                                            <div className="relative">
-                                                                <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400">
-                                                                    <Lock size={16} />
-                                                                </span>
-                                                                <input 
-                                                                    type="password" 
-                                                                    value={formData.password}
-                                                                    onChange={e => setFormData({...formData, password: e.target.value})}
-                                                                    className="w-full pl-11 pr-10 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                                                                    placeholder="Minimum 8 karakter"
-                                                                />
-                                                                <span className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 cursor-pointer hover:text-navy">
-                                                                    <Eye size={16} />
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </>
-                                                ) : (
-                                                    <div>
-                                                        <label className="text-xs font-bold text-navy block mb-2">Password</label>
-                                                        <div className="relative">
-                                                            <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400">
-                                                                <Lock size={16} />
-                                                            </span>
-                                                            <input 
-                                                                type="password" 
-                                                                value={formData.password}
-                                                                onChange={e => setFormData({...formData, password: e.target.value})}
-                                                                className="w-full pl-11 pr-10 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                                                                required
-                                                                placeholder="Minimum 8 karakter"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="mt-10 pt-6 border-t border-slate-100 flex justify-end gap-3">
-                                            <button 
-                                                type="button" 
-                                                onClick={() => setIsFormOpen(false)}
-                                                className="px-6 py-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold rounded-full text-xs transition-colors cursor-pointer"
-                                            >
-                                                Batal
-                                            </button>
-                                            <button 
-                                                type="submit" 
-                                                disabled={formLoading}
-                                                className="px-6 py-3 bg-[#0f5c50] hover:bg-[#0a423a] text-white font-bold rounded-full text-xs transition-colors flex items-center justify-center min-w-[160px] shadow-md disabled:opacity-70 cursor-pointer"
-                                            >
-                                                {formLoading ? 'Menyimpan...' : 'Simpan Perubahan'}
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
+                    
+                    {/* TAB 1: DASHBOARD OVERVIEW */}
+                    {activeTab === 'dashboard' && (
+                        <div className="max-w-6xl mx-auto flex flex-col gap-8 text-left">
                             
-                            {/* Bottom profile cards (mock) */}
-                            {editGuru && (
-                                <div className="flex flex-col md:flex-row gap-6 mt-6">
-                                    {/* Profile Summary */}
-                                    <div className="w-full md:w-1/3 bg-white border border-slate-200/80 p-8 rounded-3xl shadow-sm flex flex-col items-center justify-center text-center">
-                                        <div className="relative mb-4">
-                                            <div className="w-20 h-20 rounded-full border-4 border-white shadow-md overflow-hidden bg-slate-200">
-                                                <img src="https://i.pravatar.cc/150?img=12" alt="Profile" />
-                                            </div>
-                                            <div className="absolute bottom-0 right-0 w-6 h-6 bg-[#b87c1a] text-white rounded-full flex items-center justify-center border-2 border-white">
-                                                <Star size={10} fill="currentColor" />
-                                            </div>
-                                        </div>
-                                        <h4 className="text-lg font-bold text-navy">{formData.name}</h4>
-                                        <p className="text-xs text-slate-500 mb-6">Pengajar</p>
-                                        
-                                        <div className="w-full border-t border-slate-100 pt-6 flex justify-between px-4">
-                                            <div>
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Sesi</p>
-                                                <p className="text-2xl font-black text-[#0f5c50]">24</p>
-                                            </div>
-                                            <div className="w-px bg-slate-100"></div>
-                                            <div>
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Rating</p>
-                                                <p className="text-2xl font-black text-[#b87c1a]">4.8</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Recent Activity */}
-                                    <div className="flex-1 bg-[#eaeef3] border border-slate-200/50 p-8 rounded-3xl relative overflow-hidden flex flex-col justify-center">
-                                        <div className="absolute -bottom-10 -right-10 text-slate-200/50">
-                                            <History size={160} strokeWidth={3} />
-                                        </div>
-                                        <h4 className="text-sm font-bold text-indigo-700 mb-6 relative z-10">Riwayat Aktivitas Terakhir</h4>
-                                        
-                                        <div className="flex flex-col gap-6 relative z-10">
-                                            <div className="flex items-start gap-4">
-                                                <div className="w-8 h-8 rounded-full bg-indigo-500 text-white flex items-center justify-center mt-1 shadow-sm">
-                                                    <Edit2 size={14} />
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-navy">Mengubah materi sesi "Aljabar Dasar"</p>
-                                                    <p className="text-[10px] text-slate-500">2 jam yang lalu</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-start gap-4">
-                                                <div className="w-8 h-8 rounded-full bg-[#f5a623] text-white flex items-center justify-center mt-1 shadow-sm">
-                                                    <LogIn size={14} />
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-navy">Login terakhir dari Chrome Windows</p>
-                                                    <p className="text-[10px] text-slate-500">Kemarin, 14:20</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    ) : activeTab === 'dashboard' ? (
-                        <div className="max-w-6xl mx-auto flex flex-col gap-8">
+                            {/* Heading section (perfect alignment) */}
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                 <div>
-                                    <h2 className="text-3xl font-bold text-navy mb-1 tracking-tight">Selamat Datang, Admin</h2>
-                                    <p className="text-slate-500 text-sm">Berikut adalah ringkasan aktivitas dan data guru saat ini.</p>
+                                    <h2 className="text-3xl font-extrabold text-navy tracking-tight mb-1">Dashboard Ringkasan</h2>
+                                    <p className="text-slate-500 text-sm">Pusat kendali operasional, statistik guru, siswa, dan sesi belajar stugether.</p>
                                 </div>
-                                <div className="flex items-center gap-2 bg-[#f0f4f8] px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 border border-slate-200">
-                                    <Calendar size={14} className="text-primary" />
-                                    <span>Hari Ini: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                                <div className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-600 border border-slate-200 shadow-sm">
+                                    <Calendar size={15} className="text-[#0f5c50]" />
+                                    <span>{new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}</span>
                                 </div>
                             </div>
                             
+                            {/* 3 Metric Cards */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 {/* Total Siswa */}
-                                <div className="bg-white border border-slate-200/80 p-8 rounded-3xl shadow-sm flex flex-col relative overflow-hidden group">
-                                    <div className="w-12 h-12 rounded-full bg-[#e6f4f1] flex items-center justify-center text-[#1b7668] mb-8">
-                                        <Users size={20} />
+                                <div className="bg-white border border-slate-200/80 p-8 rounded-3xl shadow-sm flex flex-col justify-between group hover:shadow-md transition-shadow">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <div className="w-12 h-12 rounded-2xl bg-[#e6f7f4] flex items-center justify-center text-[#0f5c50]">
+                                            <Users size={22} />
+                                        </div>
+                                        <span className="text-[10px] font-bold text-[#0f5c50] bg-[#e6f7f4] px-3 py-1 rounded-full">Aktif</span>
                                     </div>
                                     <div>
-                                        <p className="text-xs font-bold text-slate-500 mb-1">Total Siswa</p>
-                                        <p className="text-5xl font-black text-navy">{stats.siswa_count}</p>
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Siswa Terdaftar</p>
+                                        <p className="text-4xl font-black text-navy">{stats.siswa_count}</p>
                                     </div>
-                                    <div className="mt-8 flex items-center gap-2 text-[10px] font-bold text-[#1b7668]">
-                                        <TrendingUp size={14} /> +10% dari bulan lalu
+                                    <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-500">
+                                        <span className="flex items-center gap-1.5 text-[#0f5c50]"><TrendingUp size={14} /> Terus Bertumbuh</span>
+                                        <button onClick={() => setActiveTab('laporan')} className="text-[#0f5c50] hover:underline cursor-pointer">Lihat Rincian</button>
                                     </div>
                                 </div>
                                 
                                 {/* Guru Aktif */}
-                                <div className="bg-[#0f5c50] p-8 rounded-3xl shadow-md flex flex-col relative overflow-hidden group">
-                                    <div className="absolute -bottom-8 -right-8 text-white/10">
+                                <div className="bg-[#0f5c50] p-8 rounded-3xl shadow-md shadow-[#0f5c50]/20 flex flex-col justify-between text-white relative overflow-hidden">
+                                    <div className="absolute -bottom-8 -right-8 text-white/10 pointer-events-none">
                                         <Check size={160} strokeWidth={3} />
                                     </div>
-                                    <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white mb-8 relative z-10">
-                                        <UserCheck size={20} />
+                                    <div className="flex items-center justify-between mb-6 relative z-10">
+                                        <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white">
+                                            <UserCheck size={22} />
+                                        </div>
+                                        <span className="text-[10px] font-bold bg-white/20 text-white px-3 py-1 rounded-full">Pengajar</span>
                                     </div>
                                     <div className="relative z-10">
-                                        <p className="text-xs font-bold text-teal-100 mb-1">Guru Aktif</p>
-                                        <p className="text-5xl font-black text-white">{stats.guru_active_count}</p>
+                                        <p className="text-xs font-bold text-teal-100 uppercase tracking-wider mb-1">Guru Aktif</p>
+                                        <p className="text-4xl font-black text-white">{stats.guru_active_count}</p>
                                     </div>
-                                    <div className="mt-8 flex items-center gap-2 text-[10px] font-bold text-white relative z-10">
-                                        <Users size={14} /> Semua guru sedang aktif
+                                    <div className="mt-6 pt-4 border-t border-white/20 flex items-center justify-between text-xs font-bold text-teal-100 relative z-10">
+                                        <span>SD & SMP</span>
+                                        <button onClick={() => setActiveTab('guru')} className="text-white hover:underline cursor-pointer">Kelola Guru</button>
                                     </div>
                                 </div>
                                 
-                                {/* Guru Nonaktif */}
-                                <div className="bg-white border border-slate-200/80 p-8 rounded-3xl shadow-sm flex flex-col relative overflow-hidden group">
-                                    <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 mb-8">
-                                        <UserX size={20} />
+                                {/* Sesi Belajar Terjadwal */}
+                                <div className="bg-white border border-slate-200/80 p-8 rounded-3xl shadow-sm flex flex-col justify-between group hover:shadow-md transition-shadow">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <div className="w-12 h-12 rounded-2xl bg-[#fff9e6] flex items-center justify-center text-[#b87c1a]">
+                                            <Calendar size={22} />
+                                        </div>
+                                        <span className="text-[10px] font-bold text-[#b87c1a] bg-[#fff9e6] px-3 py-1 rounded-full">Jadwal Sesi</span>
                                     </div>
                                     <div>
-                                        <p className="text-xs font-bold text-slate-500 mb-1">Guru Nonaktif</p>
-                                        <p className="text-5xl font-black text-navy">{stats.guru_inactive_count}</p>
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Sesi Terjadwal</p>
+                                        <p className="text-4xl font-black text-navy">{stats.sessions_scheduled_count || 0}</p>
                                     </div>
-                                    <div className="mt-8 flex items-center gap-2 text-[10px] font-bold text-slate-400">
-                                        <Info size={14} /> Tidak ada guru tertunda
+                                    <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-500">
+                                        <span className="text-[#b87c1a] font-semibold">{stats.sessions_completed_count || 0} Sesi Telah Selesai</span>
+                                        <button onClick={() => setActiveTab('sesi')} className="text-[#0f5c50] hover:underline cursor-pointer">Lihat Kalender</button>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Middle section: Chart & System Status */}
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                {/* Visualisasi Pertumbuhan */}
-                                <div className="lg:col-span-2 bg-gradient-to-br from-white to-[#f8f9fa] border border-slate-200/80 rounded-3xl p-8 flex flex-col sm:flex-row justify-between items-center overflow-hidden relative shadow-sm">
-                                    <div className="relative z-10 max-w-sm mb-6 sm:mb-0 text-left">
-                                        <h3 className="text-xl font-bold text-navy mb-2">Visualisasi<br/>Pertumbuhan</h3>
-                                        <p className="text-xs text-slate-500 leading-relaxed mb-6">Data ini menunjukkan tren interaksi antara guru dan siswa dalam sistem gether selama 30 hari terakhir.</p>
-                                        <button className="px-6 py-3 bg-[#f5a623] hover:bg-[#e09612] text-white text-xs font-bold rounded-full transition-colors cursor-pointer shadow-md">
-                                            Lihat Detail Laporan
+                            {/* Middle Banner: Visualisasi Pertumbuhan & Laporan Shortcut */}
+                            <div className="bg-gradient-to-br from-[#f0fbf9] via-white to-[#f5fbf9] border border-[#a7f3d0]/60 rounded-3xl p-8 flex flex-col sm:flex-row justify-between items-center gap-6 shadow-sm">
+                                <div className="max-w-xl text-left">
+                                    <span className="px-3 py-1 bg-[#0f5c50] text-white text-[10px] font-bold rounded-full uppercase tracking-wider inline-block mb-3">
+                                        Fitur Laporan Akademik
+                                    </span>
+                                    <h3 className="text-2xl font-black text-navy mb-2 tracking-tight">Pantau Distribusi Jenjang & Sesi Belajar</h3>
+                                    <p className="text-xs text-slate-600 leading-relaxed mb-6 font-medium">
+                                        Akses statistik komprehensif siswa aktif per jenjang (SD/SMP), evaluasi rata-rata skor kuis murid, serta rekap sesi pengajar secara berkala.
+                                    </p>
+                                    <div className="flex items-center gap-3">
+                                        <button 
+                                            onClick={() => setActiveTab('laporan')}
+                                            className="px-6 py-3 bg-[#0f5c50] hover:bg-[#0a423a] text-white text-xs font-bold rounded-2xl transition-colors cursor-pointer shadow-md flex items-center gap-2"
+                                        >
+                                            <BarChart3 size={16} /> Buka Halaman Laporan Penuh
+                                        </button>
+                                        <button 
+                                            onClick={() => setIsSessionModalOpen(true)}
+                                            className="px-6 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-navy text-xs font-bold rounded-2xl transition-colors cursor-pointer"
+                                        >
+                                            + Jadwalkan Sesi Baru
                                         </button>
                                     </div>
-                                    {/* Mock Chart */}
-                                    <div className="flex items-end gap-3 h-40 relative z-10">
-                                        <div className="w-10 bg-[#0f5c50] h-16 rounded-t-lg"></div>
-                                        <div className="w-10 bg-[#8cb3a8] h-24 rounded-t-lg"></div>
-                                        <div className="w-10 bg-[#0f5c50] h-20 rounded-t-lg"></div>
-                                        <div className="w-10 bg-[#b87c1a] h-32 rounded-t-lg"></div>
-                                        <div className="w-10 bg-[#8cb3a8] h-12 rounded-t-lg"></div>
-                                    </div>
                                 </div>
-
-                                {/* Sistem Optimal */}
-                                <div className="bg-gradient-to-br from-[#ffe8cc] to-[#ffdbb0] rounded-3xl p-8 flex flex-col justify-center relative shadow-sm">
-                                    <span className="bg-white/60 text-[#b87c1a] text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full w-max mb-4">Status Server</span>
-                                    <h3 className="text-2xl font-bold text-navy mb-8">Sistem Optimal</h3>
-                                    
-                                    <div className="flex items-center -space-x-2 mb-4">
-                                        <img src="https://i.pravatar.cc/150?img=1" className="w-8 h-8 rounded-full border-2 border-[#ffdbb0] relative z-30" />
-                                        <img src="https://i.pravatar.cc/150?img=2" className="w-8 h-8 rounded-full border-2 border-[#ffdbb0] relative z-20" />
-                                        <img src="https://i.pravatar.cc/150?img=3" className="w-8 h-8 rounded-full border-2 border-[#ffdbb0] relative z-10" />
-                                        <div className="w-8 h-8 rounded-full bg-white border-2 border-[#ffdbb0] relative z-0 flex items-center justify-center text-[10px] font-bold text-[#b87c1a]">+3</div>
+                                <div className="w-40 h-40 bg-white rounded-3xl p-4 border border-[#a7f3d0] flex flex-col items-center justify-center text-center shadow-sm shrink-0">
+                                    <div className="w-12 h-12 rounded-2xl bg-[#0f5c50] text-white flex items-center justify-center mb-2">
+                                        <GraduationCap size={24} />
                                     </div>
-                                    <p className="text-[10px] font-semibold text-navy/70 leading-relaxed">Guru yang sedang terhubung secara daring.</p>
+                                    <span className="text-xs font-extrabold text-navy">stugether</span>
+                                    <span className="text-[10px] text-[#0f5c50] font-bold">100% Real-Time</span>
                                 </div>
                             </div>
 
-                            {/* Aktivitas Terkini Table */}
-                            <div>
-                                <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-xl font-bold text-navy">Aktivitas Terkini</h3>
-                                    <button className="text-xs font-bold text-[#0f5c50] hover:underline flex items-center gap-1 cursor-pointer">
-                                        Lihat Semua <ChevronRight size={14} />
+                            {/* Aktivitas Pengajar Terkini */}
+                            <div className="flex flex-col gap-4">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="text-xl font-bold text-navy">Pengajar Terdaftar</h3>
+                                    <button onClick={() => setActiveTab('guru')} className="text-xs font-bold text-[#0f5c50] hover:underline flex items-center gap-1 cursor-pointer">
+                                        Kelola Semua Guru <ChevronRight size={14} />
                                     </button>
                                 </div>
-                                
+
                                 <div className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden shadow-sm">
                                     <table className="w-full text-left text-xs">
-                                        <thead className="bg-[#f5f7fa] text-slate-500 font-bold border-b border-slate-100">
+                                        <thead className="bg-[#f8fafc] text-slate-400 font-bold border-b border-slate-100 uppercase tracking-wider text-[10px]">
                                             <tr>
-                                                <th className="px-6 py-4 rounded-tl-3xl">Nama Guru</th>
-                                                <th className="px-6 py-4">Status</th>
-                                                <th className="px-6 py-4">Waktu Sesi Terakhir</th>
-                                                <th className="px-6 py-4 text-center rounded-tr-3xl">Aksi</th>
+                                                <th className="px-6 py-4">Nama Guru</th>
+                                                <th className="px-6 py-4">Jenjang Ajar</th>
+                                                <th className="px-6 py-4">Email</th>
+                                                <th className="px-6 py-4 text-center">Status</th>
+                                                <th className="px-6 py-4 text-right">Aksi</th>
                                             </tr>
                                         </thead>
-                                        <tbody>
-                                            {gurus.slice(0, 3).map((guru, idx) => (
-                                                <tr key={guru.id || idx} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
+                                        <tbody className="divide-y divide-slate-100">
+                                            {gurus.slice(0, 4).map((guru, idx) => (
+                                                <tr key={guru.id} className="hover:bg-slate-50/60 transition-colors">
                                                     <td className="px-6 py-4 font-bold text-navy flex items-center gap-3">
-                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${idx === 0 ? 'bg-[#f5a623]' : idx === 1 ? 'bg-[#0f5c50]' : 'bg-[#6d28d9]'}`}>
-                                                            {guru.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                                                        <div className="w-9 h-9 rounded-full bg-[#e6f7f4] text-[#0f5c50] font-bold flex items-center justify-center text-xs">
+                                                            {guru.name.substring(0, 2).toUpperCase()}
                                                         </div>
                                                         {guru.name}
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <span className="bg-[#e6f4f1] text-[#1b7668] px-3 py-1 rounded-full font-bold text-[9px] uppercase tracking-wider">Aktif</span>
+                                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                                            guru.jenjang === 'SMP' ? 'bg-indigo-50 text-indigo-700' : 'bg-[#e6f4f1] text-[#0f5c50]'
+                                                        }`}>
+                                                            Guru {guru.jenjang || 'SD'}
+                                                        </span>
                                                     </td>
-                                                    <td className="px-6 py-4 text-slate-500">10 Menit yang lalu</td>
+                                                    <td className="px-6 py-4 text-slate-500 font-medium">{guru.email}</td>
                                                     <td className="px-6 py-4 text-center">
-                                                        <button className="text-slate-400 hover:text-navy cursor-pointer"><MoreVertical size={16} /></button>
+                                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold ${
+                                                            guru.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                                                        }`}>
+                                                            <span className={`w-1.5 h-1.5 rounded-full ${guru.status === 'active' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                                                            {guru.status === 'active' ? 'Aktif' : 'Nonaktif'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <button 
+                                                            onClick={() => openEditForm(guru)}
+                                                            className="text-[#0f5c50] hover:underline font-bold text-xs cursor-pointer"
+                                                        >
+                                                            Edit
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             ))}
-                                            {gurus.length === 0 && (
-                                                <tr className="border-b border-slate-50">
-                                                    <td className="px-6 py-4 font-bold text-navy flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white bg-[#f5a623]">AS</div>
-                                                        Andini Sukmawati
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <span className="bg-[#e6f4f1] text-[#1b7668] px-3 py-1 rounded-full font-bold text-[9px] uppercase tracking-wider">Aktif</span>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-slate-500">10 Menit yang lalu</td>
-                                                    <td className="px-6 py-4 text-center">
-                                                        <button className="text-slate-400 hover:text-navy cursor-pointer"><MoreVertical size={16} /></button>
-                                                    </td>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* TAB 1.1: LAPORAN & STATISTIK (Fitur Baru Komprehensif) */}
+                    {activeTab === 'laporan' && (
+                        <div className="max-w-6xl mx-auto flex flex-col gap-8 text-left">
+                            
+                            {/* Header & Filter Controls */}
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                <div>
+                                    <h2 className="text-3xl font-extrabold text-navy tracking-tight mb-1">Laporan Akademik & Operasional</h2>
+                                    <p className="text-slate-500 text-sm">Data ringkasan aktivitas siswa, progress belajar, dan rekap sesi dari database.</p>
+                                </div>
+
+                                {/* Filters */}
+                                <div className="flex flex-wrap items-center gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+                                    <select
+                                        value={reportFilter.range}
+                                        onChange={(e) => setReportFilter({ ...reportFilter, range: e.target.value })}
+                                        className="px-3 py-2 bg-[#f8fafc] border border-slate-200 rounded-xl text-xs font-bold text-navy focus:outline-none cursor-pointer"
+                                    >
+                                        <option value="weekly">Rentang: 7 Hari Terakhir</option>
+                                        <option value="monthly">Rentang: 30 Hari Terakhir</option>
+                                        <option value="all">Semua Waktu</option>
+                                    </select>
+
+                                    <select
+                                        value={reportFilter.jenjang}
+                                        onChange={(e) => setReportFilter({ ...reportFilter, jenjang: e.target.value })}
+                                        className="px-3 py-2 bg-[#f8fafc] border border-slate-200 rounded-xl text-xs font-bold text-navy focus:outline-none cursor-pointer"
+                                    >
+                                        <option value="">Semua Jenjang</option>
+                                        <option value="SD">Jenjang SD Saja</option>
+                                        <option value="SMP">Jenjang SMP Saja</option>
+                                    </select>
+
+                                    <button 
+                                        onClick={fetchReports}
+                                        className="px-4 py-2 bg-[#0f5c50] text-white text-xs font-bold rounded-xl hover:bg-[#0a423a] transition-colors cursor-pointer"
+                                    >
+                                        Refresh Data
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Summary Grid: Jenjang & Sesi */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Siswa Aktif SD</span>
+                                    <p className="text-3xl font-black text-[#0f5c50] mb-2">{reportsData?.summary?.total_siswa_sd ?? 0}</p>
+                                    <span className="text-[11px] text-slate-500 font-medium">Bimbingan Matematika & Bahasa SD</span>
+                                </div>
+
+                                <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Siswa Aktif SMP</span>
+                                    <p className="text-3xl font-black text-indigo-600 mb-2">{reportsData?.summary?.total_siswa_smp ?? 0}</p>
+                                    <span className="text-[11px] text-slate-500 font-medium">Bimbingan Matematika & English SMP</span>
+                                </div>
+
+                                <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Sesi Terjadwal</span>
+                                    <p className="text-3xl font-black text-[#b87c1a] mb-2">{reportsData?.summary?.sessions_scheduled ?? 0}</p>
+                                    <span className="text-[11px] text-slate-500 font-medium">Siap dilaksanakan mendatang</span>
+                                </div>
+
+                                <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Sesi Berhasil Selesai</span>
+                                    <p className="text-3xl font-black text-emerald-600 mb-2">{reportsData?.summary?.sessions_completed ?? 0}</p>
+                                    <span className="text-[11px] text-slate-500 font-medium">Sesi tatap muka tuntas</span>
+                                </div>
+                            </div>
+
+                            {/* Progress Belajar per Siswa Table */}
+                            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-sm flex flex-col gap-6">
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                    <div>
+                                        <h3 className="text-lg font-bold text-navy">Progres Belajar & Evaluasi Siswa</h3>
+                                        <p className="text-xs text-slate-400">Daftar pengerjaan kuis simulasi dan rata-rata skor per murid.</p>
+                                    </div>
+                                </div>
+
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-xs">
+                                        <thead className="bg-[#f8fafc] text-slate-400 font-bold border-b border-slate-100 uppercase tracking-wider text-[10px]">
+                                            <tr>
+                                                <th className="px-4 py-3.5">Nama Siswa</th>
+                                                <th className="px-4 py-3.5">Jenjang</th>
+                                                <th className="px-4 py-3.5 text-center">Kuis Selesai</th>
+                                                <th className="px-4 py-3.5 text-center">Rata-rata Skor</th>
+                                                <th className="px-4 py-3.5 text-center">Skor Tertinggi</th>
+                                                <th className="px-4 py-3.5 text-right">Aktivitas Terakhir</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {loadingReports ? (
+                                                <tr>
+                                                    <td colSpan="6" className="px-4 py-8 text-center text-slate-400">Memuat data laporan...</td>
                                                 </tr>
+                                            ) : reportsData?.student_progress?.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan="6" className="px-4 py-8 text-center text-slate-400">Tidak ada data siswa untuk filter yang dipilih.</td>
+                                                </tr>
+                                            ) : (
+                                                reportsData?.student_progress?.map((item) => (
+                                                    <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                                                        <td className="px-4 py-4 font-bold text-navy flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-full bg-[#e6f7f4] text-[#0f5c50] font-bold flex items-center justify-center text-xs">
+                                                                {item.name.substring(0, 2).toUpperCase()}
+                                                            </div>
+                                                            <div>
+                                                                <span>{item.name}</span>
+                                                                <span className="block text-[10px] text-slate-400 font-medium">{item.email}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-4">
+                                                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                                                item.jenjang === 'SMP' ? 'bg-indigo-50 text-indigo-700' : 'bg-[#e6f4f1] text-[#0f5c50]'
+                                                            }`}>
+                                                                {item.jenjang}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-4 text-center font-bold text-navy">
+                                                            {item.quizzes_completed} Kuis
+                                                        </td>
+                                                        <td className="px-4 py-4 text-center">
+                                                            <span className="px-2.5 py-1 rounded-lg bg-[#f0edff] text-indigo-700 font-black text-xs">
+                                                                {item.average_score} / 100
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-4 text-center font-black text-emerald-600">
+                                                            {item.highest_score}
+                                                        </td>
+                                                        <td className="px-4 py-4 text-right text-slate-500 font-medium">
+                                                            {new Date(item.last_active).toLocaleDateString('id-ID')}
+                                                        </td>
+                                                    </tr>
+                                                ))
                                             )}
                                         </tbody>
                                     </table>
                                 </div>
                             </div>
                         </div>
-                    ) : activeTab === 'guru' ? (
-                        <div className="max-w-6xl mx-auto flex flex-col gap-8">
+                    )}
+
+                    {/* TAB: MANAJEMEN GURU */}
+                    {activeTab === 'guru' && (
+                        <div className="max-w-6xl mx-auto flex flex-col gap-8 text-left">
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
                                 <div className="max-w-xl">
-                                    <h2 className="text-3xl font-bold text-navy mb-2 tracking-tight">Manajemen Guru</h2>
-                                    <p className="text-slate-500 text-sm leading-relaxed">Kelola data tenaga pengajar, pantau status keaktifan, dan perbarui informasi profesional mereka di sini.</p>
+                                    <h2 className="text-3xl font-extrabold text-navy mb-2 tracking-tight">Manajemen Akun Guru</h2>
+                                    <p className="text-slate-500 text-sm leading-relaxed">Kelola data tenaga pengajar, buat akun guru baru, dan pantau status akun profesional mereka.</p>
                                 </div>
-                                
-                                <div className="flex items-center gap-4 bg-white border border-slate-200/80 px-6 py-4 rounded-3xl shadow-sm min-w-[200px]">
-                                    <div className="w-12 h-12 rounded-2xl bg-[#a7f3d0] flex items-center justify-center text-[#0f5c50]">
-                                        <UserCheck size={24} />
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Guru</p>
-                                        <p className="text-2xl font-black text-navy">{gurus.length}</p>
-                                    </div>
-                                </div>
+                                <button 
+                                    onClick={openCreateForm}
+                                    className="bg-[#0f5c50] hover:bg-[#0a423a] text-white px-6 py-3.5 rounded-2xl text-xs font-bold shadow-md transition-colors flex items-center gap-2 whitespace-nowrap cursor-pointer"
+                                >
+                                    <Plus size={16} /> Tambah Akun Guru
+                                </button>
                             </div>
-                            
+
                             <div className="bg-white border border-slate-200/80 rounded-3xl shadow-sm overflow-hidden p-6 sm:p-8">
-                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-                                    <div className="relative flex-1 max-w-sm w-full">
-                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                        <input 
-                                            type="text" 
-                                            placeholder="Cari guru..." 
-                                            value={search}
-                                            onChange={(e) => setSearch(e.target.value)}
-                                            className="w-full pl-11 pr-4 py-3.5 bg-[#f5f7fa] rounded-full text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all border-0"
-                                        />
-                                    </div>
-                                    
-                                    <div className="flex items-center gap-3 w-full sm:w-auto">
-                                        <button className="flex items-center gap-2 bg-[#eaeef3] hover:bg-[#dfe4ea] text-navy px-5 py-3.5 rounded-full text-xs font-bold transition-colors cursor-pointer">
-                                            <SlidersHorizontal size={14} /> Filter
-                                        </button>
-                                        <button 
-                                            onClick={openCreateForm}
-                                            className="bg-[#0f5c50] hover:bg-[#0a423a] text-white px-5 py-3.5 rounded-full text-xs font-bold shadow-md transition-colors flex items-center gap-2 whitespace-nowrap cursor-pointer"
-                                        >
-                                            <Plus size={16} /> Tambah Guru
-                                        </button>
-                                    </div>
-                                </div>
-                                
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left text-xs text-slate-600">
                                         <thead className="text-[10px] uppercase font-bold text-slate-400 border-b border-slate-100 tracking-wider">
@@ -656,26 +719,21 @@ export default function AdminPage({ onLogout, user }) {
                                                 <th className="px-4 py-4 pb-6 text-right">Aksi</th>
                                             </tr>
                                         </thead>
-                                        <tbody>
+                                        <tbody className="divide-y divide-slate-100">
                                             {loading ? (
                                                 <tr>
-                                                    <td colSpan="6" className="px-4 py-8 text-center text-slate-400">Memuat data...</td>
+                                                    <td colSpan="6" className="px-4 py-8 text-center text-slate-400">Memuat data guru...</td>
                                                 </tr>
                                             ) : gurus.length === 0 ? (
                                                 <tr>
                                                     <td colSpan="6" className="px-4 py-8 text-center text-slate-400">Tidak ada data guru.</td>
                                                 </tr>
                                             ) : (
-                                                gurus.map((guru, idx) => (
-                                                    <tr key={guru.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+                                                gurus.map((guru) => (
+                                                    <tr key={guru.id} className="hover:bg-slate-50/50 transition-colors">
                                                         <td className="px-4 py-5 flex items-center gap-4">
-                                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm ${
-                                                                idx % 4 === 0 ? 'bg-[#a7f3d0] text-[#0f5c50]' : 
-                                                                idx % 4 === 1 ? 'bg-[#fed7aa] text-[#9a3412]' : 
-                                                                idx % 4 === 2 ? 'bg-[#c7d2fe] text-[#3730a3]' : 
-                                                                'bg-[#fde68a] text-[#854d0e]'
-                                                            }`}>
-                                                                {guru.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                                                            <div className="w-10 h-10 rounded-full bg-[#e6f7f4] text-[#0f5c50] flex items-center justify-center text-xs font-bold shadow-sm">
+                                                                {guru.name.substring(0, 2).toUpperCase()}
                                                             </div>
                                                             <div>
                                                                 <p className="font-bold text-navy text-sm">{guru.name}</p>
@@ -695,31 +753,31 @@ export default function AdminPage({ onLogout, user }) {
                                                         <td className="px-4 py-5 text-center">
                                                             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wide ${
                                                                 guru.status === 'active' 
-                                                                    ? 'bg-[#e6f4f1] text-[#1b7668]' 
+                                                                    ? 'bg-emerald-50 text-emerald-700' 
                                                                     : 'bg-rose-50 text-rose-600'
                                                             }`}>
-                                                                <span className={`w-1.5 h-1.5 rounded-full ${guru.status === 'active' ? 'bg-[#1b7668]' : 'bg-rose-600'}`}></span>
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${guru.status === 'active' ? 'bg-emerald-600' : 'bg-rose-600'}`}></span>
                                                                 {guru.status === 'active' ? 'Aktif' : 'Nonaktif'}
                                                             </span>
                                                         </td>
                                                         <td className="px-4 py-5 text-center font-medium text-slate-500">
                                                             {new Date(guru.created_at).toLocaleDateString('id-ID')}
                                                         </td>
-                                                        <td className="px-4 py-5">
-                                                            <div className="flex items-center justify-end gap-4">
+                                                        <td className="px-4 py-5 text-right">
+                                                            <div className="flex items-center justify-end gap-3">
                                                                 <button 
                                                                     onClick={() => openEditForm(guru)}
-                                                                    className="text-[#1b7668] hover:text-[#0f5c50] transition-colors cursor-pointer"
-                                                                    title="Edit"
+                                                                    className="px-3 py-1.5 bg-[#f0fbf9] text-[#0f5c50] rounded-xl font-bold hover:bg-[#e6f7f4] transition-colors cursor-pointer"
                                                                 >
-                                                                    <Edit2 size={18} strokeWidth={2.5} />
+                                                                    Edit
                                                                 </button>
                                                                 <button 
                                                                     onClick={() => handleToggleStatus(guru.id)}
-                                                                    className="text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
-                                                                    title={guru.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'}
+                                                                    className={`px-3 py-1.5 rounded-xl font-bold transition-colors cursor-pointer ${
+                                                                        guru.status === 'active' ? 'bg-rose-50 text-rose-600 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                                                    }`}
                                                                 >
-                                                                    <Ban size={18} strokeWidth={2.5} />
+                                                                    {guru.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'}
                                                                 </button>
                                                             </div>
                                                         </td>
@@ -731,31 +789,332 @@ export default function AdminPage({ onLogout, user }) {
                                 </div>
                             </div>
                         </div>
-                    ) : activeTab === 'kurikulum' ? (
-                        <div className="max-w-6xl mx-auto flex flex-col gap-8">
-                            <div className="max-w-xl">
-                                <h2 className="text-3xl font-bold text-navy mb-2 tracking-tight">Upload Kurikulum</h2>
-                                <p className="text-slate-500 text-sm leading-relaxed">Kelola file detail kurikulum yang akan dapat diakses oleh user di halaman Jalur Belajar.</p>
+                    )}
+
+                    {/* TAB: JADWAL SESI BELAJAR */}
+                    {activeTab === 'sesi' && (
+                        <div className="max-w-6xl mx-auto flex flex-col gap-8 text-left">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div>
+                                    <h2 className="text-3xl font-extrabold text-navy tracking-tight mb-1">Jadwal Sesi Belajar</h2>
+                                    <p className="text-slate-500 text-sm">Kelola jadwal pertemuan virtual antara guru dan siswa bimbingan.</p>
+                                </div>
+                                <button 
+                                    onClick={() => setIsSessionModalOpen(true)}
+                                    className="px-6 py-3.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white text-xs font-bold rounded-2xl transition-colors cursor-pointer shadow-md flex items-center gap-2"
+                                >
+                                    <Plus size={16} /> Tambah Sesi Baru
+                                </button>
                             </div>
-                            <div className="bg-white border border-slate-200/80 p-8 rounded-3xl shadow-sm max-w-2xl">
-                                <form onSubmit={(e) => { e.preventDefault(); alert('Fitur upload kurikulum sedang dalam tahap pengembangan (Simulasi frontend berhasil).'); }}>
-                                    <div className="mb-6">
-                                        <label className="text-xs font-bold text-navy block mb-2">Judul Kurikulum</label>
-                                        <input type="text" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:border-primary transition-all" placeholder="Contoh: Kurikulum SD & SMP 2026" required />
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {sessionsList.length === 0 ? (
+                                    <div className="col-span-full bg-white p-12 rounded-3xl border border-slate-200 text-center text-slate-400">
+                                        Belum ada jadwal sesi belajar. Klik "Tambah Sesi Baru" untuk menjadwalkan.
                                     </div>
-                                    <div className="mb-6">
-                                        <label className="text-xs font-bold text-navy block mb-2">File Dokumen (PDF)</label>
-                                        <input type="file" accept=".pdf" className="w-full px-4 py-3 bg-[#f5f7fa] border border-slate-200 rounded-xl text-sm" required />
-                                    </div>
-                                    <button type="submit" className="px-6 py-3 bg-[#0f5c50] hover:bg-[#0a423a] text-white font-bold rounded-full text-xs shadow-md cursor-pointer transition-colors">
-                                        Upload File
-                                    </button>
-                                </form>
+                                ) : (
+                                    sessionsList.map(session => (
+                                        <div key={session.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                                            <div>
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                                        session.jenjang === 'SMP' ? 'bg-indigo-50 text-indigo-700' : 'bg-[#e6f4f1] text-[#0f5c50]'
+                                                    }`}>
+                                                        {session.jenjang}
+                                                    </span>
+                                                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                                                        session.status === 'completed' ? 'bg-emerald-50 text-emerald-700' :
+                                                        session.status === 'scheduled' ? 'bg-[#fff9e6] text-[#b87c1a]' : 'bg-slate-100 text-slate-600'
+                                                    }`}>
+                                                        {session.status}
+                                                    </span>
+                                                </div>
+                                                <h4 className="font-bold text-navy text-base mb-2">{session.judul}</h4>
+                                                <p className="text-xs text-slate-500 leading-relaxed line-clamp-2 mb-4">{session.deskripsi || 'Tidak ada deskripsi.'}</p>
+                                                
+                                                <div className="flex flex-col gap-1.5 text-xs text-slate-600 mb-4 bg-slate-50 p-3 rounded-2xl">
+                                                    <div className="flex items-center gap-2">
+                                                        <User size={14} className="text-[#0f5c50]" />
+                                                        <span className="font-semibold">{session.guru?.name || 'Guru'}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Clock size={14} className="text-[#0f5c50]" />
+                                                        <span>{new Date(session.waktu_mulai).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {session.link_meeting && (
+                                                <a 
+                                                    href={session.link_meeting} 
+                                                    target="_blank" 
+                                                    rel="noreferrer"
+                                                    className="w-full py-2.5 bg-[#f0fbf9] hover:bg-[#e6f7f4] text-[#0f5c50] text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
+                                                >
+                                                    <Video size={14} /> Buka Link Meeting
+                                                </a>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
                             </div>
                         </div>
-                    ) : null}
+                    )}
+
+                    {/* TAB: PENGATURAN LANDING PAGE */}
+                    {activeTab === 'pengaturan' && (
+                        <div className="max-w-3xl mx-auto flex flex-col gap-8 text-left">
+                            <div>
+                                <h2 className="text-3xl font-extrabold text-navy tracking-tight mb-1">Pengaturan Halaman Landing</h2>
+                                <p className="text-slate-500 text-sm">Kelola teks utama, gambar hero, dan badge statistik pada landing page publik.</p>
+                            </div>
+
+                            <form onSubmit={handleSaveSettings} className="bg-white border border-slate-200/80 p-8 rounded-3xl shadow-sm flex flex-col gap-6">
+                                <div>
+                                    <label className="text-xs font-bold text-navy block mb-2">Judul Hero (Headline)</label>
+                                    <input
+                                        type="text"
+                                        value={siteSettings.hero_title}
+                                        onChange={(e) => setSiteSettings({ ...siteSettings, hero_title: e.target.value })}
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:outline-none focus:border-[#0f5c50]"
+                                        placeholder="Cerdaskan Si Kecil dengan Adab & Prestasi"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-bold text-navy block mb-2">Deskripsi Hero</label>
+                                    <textarea
+                                        rows={3}
+                                        value={siteSettings.hero_subtitle}
+                                        onChange={(e) => setSiteSettings({ ...siteSettings, hero_subtitle: e.target.value })}
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:outline-none focus:border-[#0f5c50]"
+                                        placeholder="Fokus pada penguasaan Matematika & Bahasa Inggris..."
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-bold text-navy block mb-2">URL Foto Hero Image</label>
+                                    <input
+                                        type="url"
+                                        value={siteSettings.hero_image_url}
+                                        onChange={(e) => setSiteSettings({ ...siteSettings, hero_image_url: e.target.value })}
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:outline-none focus:border-[#0f5c50]"
+                                        placeholder="https://..."
+                                    />
+                                    {siteSettings.hero_image_url && (
+                                        <div className="mt-3 w-48 h-28 rounded-2xl overflow-hidden border border-slate-200">
+                                            <img src={siteSettings.hero_image_url} alt="Preview" className="w-full h-full object-cover" />
+                                        </div>
+                                    )}
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={savingSettings}
+                                    className="px-6 py-3.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white font-bold rounded-2xl text-xs shadow-md transition-colors self-start cursor-pointer"
+                                >
+                                    {savingSettings ? 'Menyimpan...' : 'Simpan Pengaturan Landing'}
+                                </button>
+                            </form>
+                        </div>
+                    )}
                 </div>
             </main>
+
+            {/* MODAL: TAMBAH SESI (Single Consolidated Flow) */}
+            {isSessionModalOpen && (
+                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl border border-slate-200 text-left">
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-[#f8fafc]">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-2xl bg-[#e6f7f4] text-[#0f5c50] flex items-center justify-center">
+                                    <Calendar size={20} />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-base text-navy">Jadwalkan Sesi Belajar Baru</h3>
+                                    <p className="text-xs text-slate-400">Hubungkan sesi tatap muka langsung ke kalender siswa & guru.</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsSessionModalOpen(false)} className="text-slate-400 hover:text-navy cursor-pointer">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleCreateSession} className="p-6 flex flex-col gap-4">
+                            <div>
+                                <label className="text-xs font-bold text-navy block mb-1">Guru Pengajar <span className="text-rose-500">*</span></label>
+                                <select
+                                    required
+                                    value={sessionFormData.guru_id}
+                                    onChange={(e) => setSessionFormData({ ...sessionFormData, guru_id: e.target.value })}
+                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50] cursor-pointer"
+                                >
+                                    <option value="">-- Pilih Guru --</option>
+                                    {gurus.map(g => (
+                                        <option key={g.id} value={g.id}>{g.name} (Guru {g.jenjang || 'SD'})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-bold text-navy block mb-1">Jenjang <span className="text-rose-500">*</span></label>
+                                    <select
+                                        value={sessionFormData.jenjang}
+                                        onChange={(e) => setSessionFormData({ ...sessionFormData, jenjang: e.target.value })}
+                                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50] cursor-pointer"
+                                    >
+                                        <option value="SD">Jenjang SD</option>
+                                        <option value="SMP">Jenjang SMP</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-navy block mb-1">Waktu Mulai <span className="text-rose-500">*</span></label>
+                                    <input
+                                        required
+                                        type="datetime-local"
+                                        value={sessionFormData.waktu_mulai}
+                                        onChange={(e) => setSessionFormData({ ...sessionFormData, waktu_mulai: e.target.value })}
+                                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-navy block mb-1">Judul Sesi <span className="text-rose-500">*</span></label>
+                                <input
+                                    required
+                                    type="text"
+                                    placeholder="Contoh: Pendalaman Materi Logika Aljabar"
+                                    value={sessionFormData.judul}
+                                    onChange={(e) => setSessionFormData({ ...sessionFormData, judul: e.target.value })}
+                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-navy block mb-1">Link Meeting (Google Meet / Zoom)</label>
+                                <input
+                                    type="url"
+                                    placeholder="https://meet.google.com/..."
+                                    value={sessionFormData.link_meeting}
+                                    onChange={(e) => setSessionFormData({ ...sessionFormData, link_meeting: e.target.value })}
+                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsSessionModalOpen(false)}
+                                    className="px-5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={sessionLoading}
+                                    className="px-6 py-2.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white rounded-xl text-xs font-bold shadow-md cursor-pointer disabled:opacity-50"
+                                >
+                                    {sessionLoading ? 'Menyimpan...' : 'Simpan Jadwal Sesi'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL: CREATE / EDIT GURU */}
+            {isFormOpen && (
+                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl border border-slate-200 text-left">
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-[#f8fafc]">
+                            <div>
+                                <h3 className="font-bold text-base text-navy">{editGuru ? 'Edit Akun Guru' : 'Buat Akun Guru Baru'}</h3>
+                                <p className="text-xs text-slate-400">Lengkapi data profil dan keamanan akun tenaga pengajar.</p>
+                            </div>
+                            <button onClick={() => setIsFormOpen(false)} className="text-slate-400 hover:text-navy cursor-pointer">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSubmitForm} className="p-6 flex flex-col gap-4">
+                            <div>
+                                <label className="text-xs font-bold text-navy block mb-1">Nama Lengkap Guru <span className="text-rose-500">*</span></label>
+                                <input
+                                    required
+                                    type="text"
+                                    value={formData.name}
+                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-bold text-navy block mb-1">Email <span className="text-rose-500">*</span></label>
+                                    <input
+                                        required
+                                        type="email"
+                                        value={formData.email}
+                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-navy block mb-1">Jenjang Ajar <span className="text-rose-500">*</span></label>
+                                    <select
+                                        value={formData.jenjang}
+                                        onChange={(e) => setFormData({ ...formData, jenjang: e.target.value })}
+                                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50] cursor-pointer"
+                                    >
+                                        <option value="SD">Guru SD</option>
+                                        <option value="SMP">Guru SMP</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-navy block mb-1">
+                                    {editGuru ? 'Password Baru (Kosongkan jika tidak diubah)' : 'Kata Sandi Awal *'}
+                                </label>
+                                <input
+                                    type="password"
+                                    required={!editGuru}
+                                    placeholder={editGuru ? '••••••••' : 'Minimal 6 karakter'}
+                                    value={formData.password}
+                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsFormOpen(false)}
+                                    className="px-5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={formLoading}
+                                    className="px-6 py-2.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white rounded-xl text-xs font-bold shadow-md cursor-pointer disabled:opacity-50"
+                                >
+                                    {formLoading ? 'Menyimpan...' : 'Simpan Akun Guru'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* CHAT MESSAGING DRAWER */}
+            <ChatDrawer
+                isOpen={isChatOpen}
+                onClose={() => setIsChatOpen(false)}
+                currentUser={user || { id: 0, role: 'admin' }}
+            />
         </div>
     );
 }

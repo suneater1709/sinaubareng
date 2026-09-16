@@ -89,11 +89,9 @@ export default function AuthPage({ onLogin, onNavigate }) {
                     isRegister || role === 'siswa' ? 'bg-[#0f5c50]' : role === 'guru' ? 'bg-[#00c49a]' : 'bg-[#161938]'
                 }`}>
                     
-                    <div className="flex items-center gap-2 cursor-pointer z-10" onClick={() => onNavigate('landing')}>
-                        <div className="w-8 h-8 rounded-lg bg-white p-0.5 flex items-center justify-center shadow-sm">
-                            <span className={`font-black text-sm font-sans ${isRegister || role === 'siswa' ? 'text-[#0f5c50]' : role === 'guru' ? 'text-[#00c49a]' : 'text-[#161938]'}`}>S</span>
-                        </div>
-                        <span className="font-bold tracking-wide text-lg font-sans">stugether</span>
+                    <div className="flex items-center gap-2.5 cursor-pointer z-10" onClick={() => onNavigate('landing')}>
+                        <img src="/favicon.ico" alt="stugether" className="w-8 h-8 rounded-lg object-contain bg-white p-0.5 shadow-sm" />
+                        <span className="font-extrabold tracking-tight text-xl font-sans">stugether</span>
                     </div>
 
                     <div className="my-12 z-10">

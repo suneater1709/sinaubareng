@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../utils/api';
+import ChatDrawer from './ChatDrawer';
+import NotificationDropdown from './NotificationDropdown';
 import { 
     BookOpen, CheckSquare, Award, Clock, ArrowLeft, ArrowRight, Play, CheckCircle2, AlertCircle,
     User, LogOut, ChevronRight, Download, Eye, Music, Image as ImageIcon, ZoomIn, Info, Loader, Sparkles,
@@ -10,6 +12,14 @@ import {
 export default function StudentDashboard({ user = {}, onNavigate, onLogout, showToast }) {
     const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'materials' | 'quizzes' | 'profile'
     const [quizSubTab, setQuizSubTab] = useState('aktif'); // 'aktif' | 'riwayat'
+    
+    // Notifications & Chat State
+    const [isChatOpen, setIsChatOpen] = useState(false);
+    const [isNotifOpen, setIsNotifOpen] = useState(false);
+
+    // Real-time Rankings State
+    const [rankingsData, setRankingsData] = useState({ leaderboard: [], current_user_rank: null, total_students: 0 });
+    const [loadingRankings, setLoadingRankings] = useState(false);
     
     // Core data lists
     const [materials, setMaterials] = useState([]);
@@ -120,7 +130,26 @@ export default function StudentDashboard({ user = {}, onNavigate, onLogout, show
         fetchMaterials();
         fetchQuizzes();
         fetchHistory();
+        fetchRankings();
+
+        // Polling rankings every 6 seconds for real-time leaderboard update
+        const interval = setInterval(() => {
+            fetchRankings(true);
+        }, 6000);
+        return () => clearInterval(interval);
     }, []);
+
+    const fetchRankings = async (silent = false) => {
+        if (!silent) setLoadingRankings(true);
+        try {
+            const data = await api.get('/rankings');
+            setRankingsData(data || { leaderboard: [], current_user_rank: null, total_students: 0 });
+        } catch (err) {
+            console.error('Failed to fetch rankings:', err);
+        } finally {
+            if (!silent) setLoadingRankings(false);
+        }
+    };
 
     const fetchMaterials = async () => {
         try {
@@ -204,6 +233,7 @@ export default function StudentDashboard({ user = {}, onNavigate, onLogout, show
             });
             setActiveQuiz(null);
             fetchHistory();
+            fetchRankings(true); // Instant leaderboard update
         } catch (err) {
             showToast('Gagal mengumpulkan kuis: ' + err.message, 'error');
         } finally {
@@ -313,12 +343,10 @@ export default function StudentDashboard({ user = {}, onNavigate, onLogout, show
                 <div>
                     {/* Logo Section */}
                     <div className="flex items-center gap-3 mb-10 cursor-pointer" onClick={() => onNavigate('beranda')}>
-                        <div className="w-10 h-10 rounded-[14px] bg-teal flex items-center justify-center">
-                            <span className="font-extrabold text-white text-xl">S</span>
-                        </div>
+                        <img src="/favicon.ico" alt="stugether" className="w-9 h-9 rounded-xl object-contain shadow-sm" />
                         <div className="text-left">
-                            <span className="font-extrabold text-navy text-lg block leading-none">stugether.</span>
-                            <span className="text-[10px] text-slate-400 font-bold tracking-wider block mt-1">SISWA ({user.jenjang || 'SD'})</span>
+                            <span className="font-extrabold text-navy text-lg block leading-none tracking-tight">stugether</span>
+                            <span className="text-[10px] text-slate-400 font-bold tracking-wider block mt-1 uppercase">Siswa ({user.jenjang || 'SD'})</span>
                         </div>
                     </div>
 
@@ -406,16 +434,27 @@ export default function StudentDashboard({ user = {}, onNavigate, onLogout, show
                     </div>
 
                     {/* Header quick actions */}
-                    <div className="flex items-center gap-6">
-                        <button className="text-slate-600 hover:text-primary transition-colors cursor-pointer relative">
-                            <Bell size={24} />
-                            <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-[#fafbfc]"></span>
-                        </button>
-                        <button className="text-slate-600 hover:text-primary transition-colors cursor-pointer">
-                            <Mail size={24} />
+                    <div className="flex items-center gap-4">
+                        <div className="relative">
+                            <button 
+                                onClick={() => setIsNotifOpen(!isNotifOpen)}
+                                className="text-slate-600 hover:text-primary transition-colors cursor-pointer relative p-2.5 rounded-2xl hover:bg-slate-100"
+                                title="Notifikasi"
+                            >
+                                <Bell size={22} />
+                                <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white"></span>
+                            </button>
+                            <NotificationDropdown isOpen={isNotifOpen} onClose={() => setIsNotifOpen(false)} />
+                        </div>
+                        <button 
+                            onClick={() => setIsChatOpen(true)}
+                            className="text-slate-600 hover:text-primary transition-colors cursor-pointer p-2.5 rounded-2xl hover:bg-slate-100 relative"
+                            title="Buka Pesan"
+                        >
+                            <Mail size={22} />
                         </button>
                         
-                        <div className="w-px h-10 bg-slate-200"></div>
+                        <div className="w-px h-8 bg-slate-200 mx-1"></div>
                         
                         {/* User Profile Avatar */}
                         <div className="flex items-center gap-3 cursor-pointer group">
@@ -971,57 +1010,85 @@ export default function StudentDashboard({ user = {}, onNavigate, onLogout, show
                                 <div className="w-full lg:w-80 flex flex-col gap-6 shrink-0">
                                     
                                     {/* Leaderboard Panel */}
-                                    <div className="bg-[#f5f7fa] rounded-[32px] p-6 border border-slate-200/60 shadow-sm relative overflow-hidden">
+                                    <div className="bg-[#f5f7fa] rounded-[32px] p-6 border border-slate-200/60 shadow-sm relative overflow-hidden text-left">
                                         <div className="flex justify-between items-center mb-6 relative z-10">
-                                            <h3 className="font-bold text-navy text-lg">Papan Peringkat</h3>
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="font-bold text-navy text-lg">Papan Peringkat</h3>
+                                                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                                            </div>
                                             <Trophy size={18} className="text-[#d4a017]" />
                                         </div>
                                         
                                         {/* Current User Rank Card */}
-                                        <div className="bg-[#0f5c50] rounded-2xl p-4 flex items-center justify-between mb-6 relative z-10 shadow-md text-white">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center font-bold text-sm">14</div>
-                                                <div>
-                                                    <span className="text-sm font-bold block">Kamu (Rizky A.)</span>
-                                                    <span className="text-[10px] text-teal-100">2,840 Poin</span>
+                                        {rankingsData.current_user_rank && (
+                                            <div className="bg-[#0f5c50] rounded-2xl p-4 flex items-center justify-between mb-6 relative z-10 shadow-md text-white">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center font-bold text-sm">
+                                                        #{rankingsData.current_user_rank.rank}
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-sm font-bold block">Kamu ({rankingsData.current_user_rank.name})</span>
+                                                        <span className="text-[10px] text-teal-100">{rankingsData.current_user_rank.points.toLocaleString()} Poin</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1 text-emerald-300 text-xs font-bold">
+                                                    <TrendingUp size={14} /> Live
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-1 text-emerald-300 text-xs font-bold">
-                                                <TrendingUp size={14} /> +2
-                                            </div>
+                                        )}
+
+                                        {/* Top Users from Database */}
+                                        <div className="flex flex-col gap-3 relative z-10">
+                                            {loadingRankings && rankingsData.leaderboard.length === 0 ? (
+                                                <div className="py-8 text-center text-xs text-slate-400 font-medium">
+                                                    <Loader className="animate-spin inline mr-2 text-primary" size={16} /> Memuat peringkat live...
+                                                </div>
+                                            ) : rankingsData.leaderboard.length === 0 ? (
+                                                <div className="py-6 text-center text-xs text-slate-400">Belum ada siswa di papan peringkat.</div>
+                                            ) : (
+                                                rankingsData.leaderboard.slice(0, 5).map((student, idx) => (
+                                                    <div 
+                                                        key={student.id} 
+                                                        className={`flex items-center gap-3 p-2.5 rounded-2xl transition-all ${
+                                                            student.id === user?.id ? 'bg-primary/10 border border-primary/20' : 'bg-white/60 hover:bg-white border border-transparent'
+                                                        }`}
+                                                    >
+                                                        <div className="w-6 flex justify-center shrink-0">
+                                                            {idx === 0 ? (
+                                                                <Trophy size={18} className="text-[#d4a017]" />
+                                                            ) : idx === 1 ? (
+                                                                <Award size={18} className="text-slate-400" />
+                                                            ) : idx === 2 ? (
+                                                                <Award size={18} className="text-[#cd7f32]" />
+                                                            ) : (
+                                                                <span className="text-xs font-bold text-slate-400">#{idx + 1}</span>
+                                                            )}
+                                                        </div>
+                                                        <img 
+                                                            src={student.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(student.name)}&background=0f5c50&color=fff`} 
+                                                            alt={student.name} 
+                                                            className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm shrink-0" 
+                                                        />
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="text-xs font-bold text-navy truncate block">{student.name}</span>
+                                                                {student.id === user?.id && (
+                                                                    <span className="text-[9px] font-extrabold text-primary bg-primary/10 px-1.5 py-0.5 rounded">Kamu</span>
+                                                                )}
+                                                            </div>
+                                                            <span className="text-[10px] text-slate-500 block font-medium">
+                                                                {student.points.toLocaleString()} Poin • {student.completed_quizzes || 0} Kuis
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
                                         </div>
 
-                                        {/* Top 3 Users (Mock) */}
-                                        <div className="flex flex-col gap-4 relative z-10">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-6 flex justify-center text-[#d4a017]"><Trophy size={16} /></div>
-                                                <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white overflow-hidden"><img src="https://i.pravatar.cc/150?img=5" alt="Avatar" /></div>
-                                                <div>
-                                                    <span className="text-xs font-bold text-navy block">Alya Putri</span>
-                                                    <span className="text-[10px] text-slate-500">4,200 Poin</span>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-6 flex justify-center text-slate-400"><Award size={16} /></div>
-                                                <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white overflow-hidden"><img src="https://i.pravatar.cc/150?img=11" alt="Avatar" /></div>
-                                                <div>
-                                                    <span className="text-xs font-bold text-navy block">Budi Santoso</span>
-                                                    <span className="text-[10px] text-slate-500">3,950 Poin</span>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-6 flex justify-center text-[#cd7f32]"><Award size={16} /></div>
-                                                <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white overflow-hidden"><img src="https://i.pravatar.cc/150?img=9" alt="Avatar" /></div>
-                                                <div>
-                                                    <span className="text-xs font-bold text-navy block">Citra Dewi</span>
-                                                    <span className="text-[10px] text-slate-500">3,720 Poin</span>
-                                                </div>
-                                            </div>
+                                        <div className="mt-4 pt-3 border-t border-slate-200/60 flex justify-between items-center text-[10px] text-slate-400">
+                                            <span>Real-time polling aktif</span>
+                                            <span className="font-semibold">{rankingsData.total_students || rankingsData.leaderboard.length} Siswa Terdaftar</span>
                                         </div>
-
-                                        <button className="w-full mt-6 text-sm font-bold text-[#0f5c50] hover:underline relative z-10 cursor-pointer">
-                                            Lihat Selengkapnya
-                                        </button>
                                     </div>
 
                                     {/* Motivation Box */}
@@ -1153,6 +1220,13 @@ export default function StudentDashboard({ user = {}, onNavigate, onLogout, show
                         </div>
                     </div>
                 )}
+
+                {/* Floating Chat Drawer */}
+                <ChatDrawer 
+                    isOpen={isChatOpen} 
+                    onClose={() => setIsChatOpen(false)} 
+                    currentUser={user} 
+                />
             </main>
         </div>
     );

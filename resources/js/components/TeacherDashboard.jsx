@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import { resilientMediaUpload } from '../utils/upload';
+import ChatDrawer from './ChatDrawer';
+import NotificationDropdown from './NotificationDropdown';
 import { 
     BookOpen, FileText, Upload, Plus, Trash2, Edit3, Save, CheckSquare, 
     LogOut, Award, User, Clock, FileSpreadsheet, Eye, Music, Image as ImageIcon, Sparkles, Loader,
@@ -9,6 +11,10 @@ import {
 
 export default function TeacherDashboard({ user, onNavigate, onLogout, showToast }) {
     const [activeTab, setActiveTab] = useState('stats'); // 'stats' | 'students' | 'materials' | 'quizzes'
+    
+    // Notifications & Chat State
+    const [isChatOpen, setIsChatOpen] = useState(false);
+    const [isNotifOpen, setIsNotifOpen] = useState(false);
     
     // Core data lists
     const [students, setStudents] = useState([]);
@@ -281,14 +287,12 @@ export default function TeacherDashboard({ user, onNavigate, onLogout, showToast
             {/* Sidebar Navigation */}
             <aside className="w-full lg:w-64 bg-white lg:border-r border-slate-100 p-6 flex flex-col justify-between text-left h-full overflow-y-auto shrink-0 z-10">
                 <div>
-                    {/* Logo Section */}
+                    {/* Standardized Universal Logo */}
                     <div className="flex items-center gap-3 mb-10 cursor-pointer" onClick={() => onNavigate('beranda')}>
-                        <div className="w-10 h-10 rounded-[14px] bg-teal flex items-center justify-center">
-                            <span className="font-extrabold text-white text-xl">S</span>
-                        </div>
+                        <img src="/favicon.ico" alt="stugether" className="w-10 h-10 object-contain rounded-xl shadow-sm bg-white p-1" />
                         <div className="text-left">
-                            <span className="font-extrabold text-navy text-lg block leading-none">stugether.</span>
-                            <span className="text-[10px] text-slate-400 font-bold tracking-wider block mt-1">GURU PANEL</span>
+                            <span className="font-extrabold text-navy text-xl block leading-none tracking-tight">stugether</span>
+                            <span className="text-[10px] text-[#0f5c50] font-bold tracking-wider block mt-1 uppercase">GURU PANEL ({user.jenjang || 'SD'})</span>
                         </div>
                     </div>
 
@@ -366,14 +370,30 @@ export default function TeacherDashboard({ user, onNavigate, onLogout, showToast
                         </span>
                     </div>
 
-                    <div className="flex items-center gap-4">
-                        <button className="text-slate-600 hover:text-primary transition-colors cursor-pointer">
-                            <Mail size={20} />
+                    <div className="flex items-center gap-4 relative">
+                        <button 
+                            onClick={() => setIsChatOpen(true)}
+                            className="w-10 h-10 rounded-full bg-white border border-slate-200/80 text-slate-600 hover:text-primary flex items-center justify-center transition-colors cursor-pointer shadow-sm"
+                            title="Pusat Pesan"
+                        >
+                            <Mail size={18} />
                         </button>
-                        <button className="text-slate-600 hover:text-primary transition-colors cursor-pointer relative">
-                            <Bell size={20} />
-                            <span className="absolute top-0 right-0 w-2 h-2 bg-rose-500 rounded-full"></span>
-                        </button>
+                        <div className="relative">
+                            <button 
+                                onClick={() => setIsNotifOpen(!isNotifOpen)}
+                                className="w-10 h-10 rounded-full bg-white border border-slate-200/80 text-slate-600 hover:text-primary flex items-center justify-center transition-colors cursor-pointer shadow-sm relative"
+                                title="Notifikasi"
+                            >
+                                <Bell size={18} />
+                                <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full"></span>
+                            </button>
+
+                            <NotificationDropdown 
+                                isOpen={isNotifOpen} 
+                                onClose={() => setIsNotifOpen(false)}
+                                onOpenChat={() => setIsChatOpen(true)}
+                            />
+                        </div>
                     </div>
                 </header>
 
@@ -1165,6 +1185,13 @@ export default function TeacherDashboard({ user, onNavigate, onLogout, showToast
                     </div>
                 )}
             </main>
+
+            {/* CHAT MESSAGING DRAWER */}
+            <ChatDrawer
+                isOpen={isChatOpen}
+                onClose={() => setIsChatOpen(false)}
+                currentUser={user || { id: 0, role: 'guru' }}
+            />
         </div>
     );
 }
