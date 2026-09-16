@@ -4,8 +4,11 @@ use App\Http\Controllers\Api\AdminGuruController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\MaterialController;
+use App\Http\Controllers\Api\MessageController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\QuestionController;
 use App\Http\Controllers\Api\QuizController;
+use App\Http\Controllers\Api\RankingController;
 use App\Http\Controllers\Api\StudentController;
 use App\Http\Controllers\Api\SubmissionController;
 use Illuminate\Support\Facades\Route;
@@ -17,6 +20,8 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/contact', [ContactController::class, 'submitContact']);
 Route::post('/schedule-visit', [ContactController::class, 'scheduleVisit']);
+Route::get('/public/stats', [AdminGuruController::class, 'publicStats']);
+Route::get('/public/settings', [AdminGuruController::class, 'settings']);
 
 // =========================================================
 // TERPROTEKSI (butuh token Sanctum)
@@ -25,17 +30,45 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
+    // ----- Notifications -----
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead']);
+    Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+
+    // ----- Messages (Role Matrix Validated) -----
+    Route::get('/messages', [MessageController::class, 'index']);
+    Route::get('/messages/{userId}', [MessageController::class, 'thread']);
+    Route::post('/messages', [MessageController::class, 'store']);
+    Route::patch('/messages/{userId}/read', [MessageController::class, 'markAsRead']);
+
+    // ----- Leaderboard / Ranking Real-Time -----
+    Route::get('/rankings', [RankingController::class, 'index']);
+
+    // ----- Sessions Schedule -----
+    Route::get('/sessions', [AdminGuruController::class, 'sessions']);
+
     // ----- Students (Guru & Admin) -----
     Route::get('/students', [StudentController::class, 'index']);
 
     // ----- Admin Routes -----
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         Route::get('/stats', [AdminGuruController::class, 'stats']);
+        Route::get('/reports', [AdminGuruController::class, 'reports']);
         Route::get('/guru', [AdminGuruController::class, 'index']);
         Route::post('/guru', [AdminGuruController::class, 'store']);
         Route::put('/guru/{guru}', [AdminGuruController::class, 'update']);
         Route::patch('/guru/{guru}/status', [AdminGuruController::class, 'toggleStatus']);
         Route::post('/guru/{guru}/reset-password', [AdminGuruController::class, 'resetPassword']);
+        
+        // Sessions management
+        Route::get('/sessions', [AdminGuruController::class, 'sessions']);
+        Route::post('/sessions', [AdminGuruController::class, 'storeSession']);
+        Route::put('/sessions/{id}', [AdminGuruController::class, 'updateSession']);
+        Route::delete('/sessions/{id}', [AdminGuruController::class, 'deleteSession']);
+
+        // Site settings
+        Route::get('/settings', [AdminGuruController::class, 'settings']);
+        Route::post('/settings', [AdminGuruController::class, 'updateSettings']);
     });
 
     // ----- Materials -----

@@ -9,7 +9,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'guru', 'siswa') NOT NULL DEFAULT 'siswa'");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'guru', 'siswa') NOT NULL DEFAULT 'siswa'");
+        }
         
         Schema::table('users', function (Blueprint $table) {
             $table->enum('status', ['active', 'inactive'])->default('active')->after('role');
@@ -25,6 +27,8 @@ return new class extends Migration
             $table->dropColumn(['status', 'created_by']);
         });
 
-        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('guru', 'siswa') NOT NULL DEFAULT 'siswa'");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('guru', 'siswa') NOT NULL DEFAULT 'siswa'");
+        }
     }
 };
