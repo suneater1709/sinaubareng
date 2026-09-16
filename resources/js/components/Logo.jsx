@@ -1,20 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 export default function Logo({ size = 'md', className = '', showText = true, textColor = 'text-navy', subtitle = null }) {
     const sizeMap = {
-        sm: { icon: 'w-7 h-7', text: 'text-lg', sSize: 'text-sm' },
-        md: { icon: 'w-8 h-8', text: 'text-2xl', sSize: 'text-base' },
-        lg: { icon: 'w-10 h-10', text: 'text-2xl', sSize: 'text-lg' }
+        sm: { img: 'w-8 h-8', text: 'text-lg', fallbackText: 'text-sm' },
+        md: { img: 'w-9 h-9', text: 'text-2xl', fallbackText: 'text-base' },
+        lg: { img: 'w-11 h-11', text: 'text-2xl', fallbackText: 'text-lg' },
+        xl: { img: 'w-14 h-14', text: 'text-3xl', fallbackText: 'text-xl' }
     };
 
     const currentSize = sizeMap[size] || sizeMap.md;
+    const [imgError, setImgError] = useState(false);
 
     return (
         <div className={`flex items-center gap-2.5 select-none ${className}`}>
-            {/* Vector Brand Icon that never breaks */}
-            <div className={`${currentSize.icon} rounded-xl bg-gradient-to-br from-[#0f5c50] to-[#00c49a] flex items-center justify-center shadow-sm shrink-0 relative overflow-hidden`}>
-                <span className={`font-black text-white ${currentSize.sSize} font-sans leading-none tracking-tighter`}>S</span>
-                <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-[#f5a623]"></span>
+            {/* Official stugether.png Logo */}
+            <div className={`${currentSize.img} rounded-xl overflow-hidden bg-white shadow-sm flex items-center justify-center shrink-0 border border-slate-100 p-0.5`}>
+                {!imgError ? (
+                    <img 
+                        src="/stugether.png" 
+                        alt="stugether" 
+                        className="w-full h-full object-contain"
+                        onError={() => setImgError(true)} 
+                    />
+                ) : (
+                    <div className="w-full h-full rounded-lg bg-gradient-to-br from-[#0f5c50] to-[#00c49a] flex items-center justify-center text-white font-black">
+                        <span className={currentSize.fallbackText}>S</span>
+                    </div>
+                )}
             </div>
 
             {showText && (
