@@ -4,14 +4,16 @@ import { resilientMediaUpload } from '../utils/upload';
 import Logo from './Logo';
 import ChatDrawer from './ChatDrawer';
 import NotificationDropdown from './NotificationDropdown';
+import Modal from './common/Modal';
 import { 
     BookOpen, FileText, Upload, Plus, Trash2, Edit3, Save, CheckSquare, 
     LogOut, Award, User, Clock, FileSpreadsheet, Eye, Music, Image as ImageIcon, Sparkles, Loader,
-    Mail, Bell, GraduationCap, LayoutDashboard, FileQuestion, Headset, FolderX, ClipboardX, ArrowUpRight, Users, Settings
+    Mail, Bell, GraduationCap, LayoutDashboard, FileQuestion, Headset, FolderX, ClipboardX, ArrowUpRight, 
+    Users, Settings, Calendar, BarChart3, Video, CheckCircle2, AlertCircle, ArrowLeft
 } from 'lucide-react';
 
 export default function TeacherDashboard({ user, onNavigate, onLogout, showToast }) {
-    const [activeTab, setActiveTab] = useState('stats'); // 'stats' | 'students' | 'materials' | 'quizzes'
+    const [activeTab, setActiveTab] = useState('stats'); // 'stats' | 'stats-detail' | 'students' | 'materials' | 'quizzes' | 'sessions'
     
     // Notifications & Chat State
     const [isChatOpen, setIsChatOpen] = useState(false);
@@ -25,9 +27,22 @@ export default function TeacherDashboard({ user, onNavigate, onLogout, showToast
     const [selectedQuiz, setSelectedQuiz] = useState(null);
     const [submissions, setSubmissions] = useState([]);
     const [selectedSubmission, setSelectedSubmission] = useState(null);
+    const [sessionsList, setSessionsList] = useState([]);
     
     // Loading states
     const [loading, setLoading] = useState(false);
+
+    // Form states - Sessions
+    const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
+    const [sessionFormData, setSessionFormData] = useState({
+        judul: '',
+        jenjang: user.jenjang || 'SD',
+        waktu_mulai: '',
+        waktu_selesai: '',
+        link_meeting: '',
+        deskripsi: ''
+    });
+    const [sessionLoading, setSessionLoading] = useState(false);
 
     // Form states - Materials
     const [newMaterial, setNewMaterial] = useState({ judul: '', deskripsi: '' });
@@ -59,7 +74,61 @@ export default function TeacherDashboard({ user, onNavigate, onLogout, showToast
         fetchMaterials();
         fetchQuizzes();
         fetchStudents();
+        fetchSessions();
     }, []);
+
+    const fetchSessions = async () => {
+        try {
+            const data = await api.get('/sessions');
+            setSessionsList(data || []);
+        } catch (err) {
+            console.error('Failed to fetch sessions:', err);
+        }
+    };
+
+    const handleCreateSession = async (e) => {
+        e.preventDefault();
+        setSessionLoading(true);
+        try {
+            await api.post('/sessions', sessionFormData);
+            showToast('Sesi belajar berhasil dijadwalkan!');
+            setIsSessionModalOpen(false);
+            setSessionFormData({
+                judul: '',
+                jenjang: user.jenjang || 'SD',
+                waktu_mulai: '',
+                waktu_selesai: '',
+                link_meeting: '',
+                deskripsi: ''
+            });
+            fetchSessions();
+        } catch (err) {
+            showToast('Gagal menjadwalkan sesi: ' + err.message, 'error');
+        } finally {
+            setSessionLoading(false);
+        }
+    };
+
+    const handleUpdateSessionStatus = async (sessionId, status) => {
+        try {
+            await api.put(`/sessions/${sessionId}`, { status });
+            showToast('Status sesi belajar berhasil diubah.');
+            fetchSessions();
+        } catch (err) {
+            showToast('Gagal mengubah status sesi: ' + err.message, 'error');
+        }
+    };
+
+    const handleDeleteSession = async (sessionId) => {
+        if (!confirm('Hapus jadwal sesi belajar ini?')) return;
+        try {
+            await api.delete(`/sessions/${sessionId}`);
+            showToast('Sesi belajar berhasil dihapus.');
+            fetchSessions();
+        } catch (err) {
+            showToast('Gagal menghapus sesi: ' + err.message, 'error');
+        }
+    };
 
     const fetchStudents = async () => {
         try {
@@ -179,17 +248,15 @@ export default function TeacherDashboard({ user, onNavigate, onLogout, showToast
             if (newQuestion.tipe === 'pilihan_ganda') {
                 newQuestion.options.forEach((opt, idx) => {
                     payload.append(`options[${idx}][teks_opsi]`, opt.teks_opsi);
-                    payload.append(`options[${idx}][is_benar]`, opt.is_benar ? 1 : 0);
+                    payload.append(`options[${idx}][is_benar]`, opt.is_benar ? '1' : '0');
                 });
             }
 
             if (uploadedMediaData) {
-                const key = questionMedia.type.startsWith('image/') ? 'gambar' : 'audio';
-                if (uploadedMediaData.storageType === 'base64') {
-                    payload.append(key, uploadedMediaData.fileBase64);
-                } else {
-                    payload.append(key, uploadedMediaData.filePath);
-                }
+                payload.append('media_type', uploadedMediaData.media_type);
+                payload.append('file_path', uploadedMediaData.file_path);
+                payload.append('public_url', uploadedMediaData.public_url);
+                payload.append('drive_id', uploadedMediaData.drive_id);
             }
 
             await api.post(`/quizzes/${selectedQuiz.id}/questions`, payload);
@@ -210,7 +277,7 @@ export default function TeacherDashboard({ user, onNavigate, onLogout, showToast
             
             fetchQuizDetails(selectedQuiz.id);
         } catch (err) {
-            showToast('Gagal menyimpan soal: ' + err.message, 'error');
+            showToast('Gagal menambah pertanyaan: ' + err.message, 'error');
         } finally {
             setLoading(false);
             setUploadingMedia(false);
@@ -228,46 +295,41 @@ export default function TeacherDashboard({ user, onNavigate, onLogout, showToast
         }
     };
 
-    // Essay grading
+    // Grading Actions
     const handleGradeSubmission = async (submissionId) => {
         setLoading(true);
         try {
-            const gradesPayload = Object.keys(grades).map(answerId => ({
-                answer_id: parseInt(answerId),
-                nilai_esai: parseFloat(grades[answerId].nilai_esai || 0),
-                feedback: grades[answerId].feedback || ''
-            }));
-
-            if (gradesPayload.length === 0) {
-                showToast('Masukkan nilai terlebih dahulu.', 'error');
-                setLoading(false);
-                return;
-            }
-
-            await api.put(`/submissions/${submissionId}/grade`, { grades: gradesPayload });
-            showToast('Penilaian esai berhasil disimpan!');
-            setSelectedSubmission(null);
-            setGrades({});
-            fetchQuizDetails(selectedQuiz.id);
+            const gradeData = grades[submissionId] || {};
+            await api.put(`/submissions/${submissionId}/grade`, {
+                skor_esai: gradeData.skor_esai || 0,
+                catatan_guru: gradeData.catatan_guru || ''
+            });
+            showToast('Penilaian pengerjaan kuis berhasil disimpan.');
+            fetchSubmissions(selectedQuiz.id);
         } catch (err) {
-            showToast('Gagal memproses nilai: ' + err.message, 'error');
+            showToast('Gagal menyimpan nilai: ' + err.message, 'error');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleExportCSV = () => {
-        if (submissions.length === 0) {
-            showToast('Tidak ada data pengerjaan murid.', 'error');
+    // Export Excel/CSV Summary
+    const handleExportSubmissions = () => {
+        if (!submissions || submissions.length === 0) {
+            showToast('Belum ada data pengerjaan untuk diekspor.', 'error');
             return;
         }
 
-        const headers = ['Nama Siswa', 'Skor PG', 'Status', 'Selesai Pada'];
+        const headers = ['Nama Siswa', 'Email', 'Jenjang', 'Skor PG', 'Skor Esai', 'Total Skor', 'Status', 'Waktu Pengumpulan'];
         const rows = submissions.map(sub => [
-            sub.siswa?.name || 'Siswa',
-            sub.skor_pg ?? 0,
-            sub.status,
-            sub.submitted_at || sub.created_at
+            `"${sub.user?.name || '-'}"`,
+            `"${sub.user?.email || '-'}"`,
+            `"${sub.user?.jenjang || '-'}"`,
+            sub.skor_pg || 0,
+            sub.skor_esai || 0,
+            (sub.skor_pg || 0) + (sub.skor_esai || 0),
+            `"${sub.status || '-'}"`,
+            `"${new Date(sub.created_at).toLocaleString('id-ID')}"`
         ]);
 
         const csvContent = "data:text/csv;charset=utf-8," 
@@ -302,6 +364,22 @@ export default function TeacherDashboard({ user, onNavigate, onLogout, showToast
                             }`}
                         >
                             <LayoutDashboard size={18} /> Dashboard Ringkasan
+                        </button>
+                        <button
+                            onClick={() => { setActiveTab('stats-detail'); setSelectedQuiz(null); }}
+                            className={`w-full py-3.5 px-4 rounded-2xl text-sm font-semibold flex items-center gap-3 transition-colors cursor-pointer ${
+                                activeTab === 'stats-detail' ? 'bg-[#f0edff] text-primary' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                            }`}
+                        >
+                            <BarChart3 size={18} /> Statistik Pengajaran
+                        </button>
+                        <button
+                            onClick={() => { setActiveTab('sessions'); setSelectedQuiz(null); }}
+                            className={`w-full py-3.5 px-4 rounded-2xl text-sm font-semibold flex items-center gap-3 transition-colors cursor-pointer ${
+                                activeTab === 'sessions' ? 'bg-[#f0edff] text-primary' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                            }`}
+                        >
+                            <Calendar size={18} /> Jadwal Sesi Belajar
                         </button>
                         <button
                             onClick={() => { setActiveTab('students'); setSelectedQuiz(null); }}
@@ -394,7 +472,7 @@ export default function TeacherDashboard({ user, onNavigate, onLogout, showToast
                     </div>
                 </header>
 
-                {/* TAB 1: Stats summary */}
+                {/* TAB 1: Stats summary (Task #8: Balanced Equal-Height Layout & Active 'Lihat Statistik') */}
                 {activeTab === 'stats' && (
                     <div className="flex flex-col gap-8 max-w-5xl mx-auto">
                         {/* Welcome Banner */}
@@ -404,13 +482,16 @@ export default function TeacherDashboard({ user, onNavigate, onLogout, showToast
                                     Selamat Datang, {user.name}!
                                 </h3>
                                 <p className="text-sm text-slate-600 max-w-md leading-relaxed mb-8">
-                                    Siap mengelola aktivitas akademik hari ini? Tambah modul belajar mandiri atau buat tantangan kuis baru bagi murid anda.
+                                    Siap mengelola aktivitas akademik hari ini? Tambah modul belajar mandiri, jadwalkan sesi tatap muka online, atau buat tantangan kuis baru bagi murid anda.
                                 </p>
                                 <div className="flex items-center gap-4">
-                                    <button onClick={() => setActiveTab('materials')} className="px-6 py-3 bg-teal text-white font-bold rounded-full shadow-lg hover:bg-teal/90 transition-all cursor-pointer">
+                                    <button onClick={() => setActiveTab('materials')} className="px-6 py-3 bg-[#0f5c50] text-white font-bold rounded-full shadow-lg hover:bg-[#0a423a] transition-all cursor-pointer">
                                         Mulai Mengajar
                                     </button>
-                                    <button className="px-6 py-3 bg-white text-navy font-bold rounded-full border border-slate-200 hover:bg-slate-50 transition-all cursor-pointer">
+                                    <button 
+                                        onClick={() => setActiveTab('stats-detail')}
+                                        className="px-6 py-3 bg-white text-navy font-bold rounded-full border border-slate-200 hover:bg-slate-50 transition-all cursor-pointer shadow-sm"
+                                    >
                                         Lihat Statistik
                                     </button>
                                 </div>
@@ -420,39 +501,46 @@ export default function TeacherDashboard({ user, onNavigate, onLogout, showToast
                             </div>
                         </div>
 
-                        {/* Summary Widgets Grid */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                            <div className="bg-[#fff9e6] border border-[#ffecb3] rounded-[24px] p-8 flex flex-col justify-between h-48">
-                                <div className="flex justify-between items-start">
-                                    <BookOpen className="text-[#d4a017]" size={28} />
-                                    <span className="px-2 py-1 bg-[#ffecb3] text-[#d4a017] text-[9px] font-bold rounded-full">UPDATE BARU</span>
+                        {/* Summary Widgets Grid - Equal Height & Standardized Alignment */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-stretch">
+                            <div className="bg-[#fff9e6] border border-[#ffecb3] rounded-[24px] p-7 flex flex-col justify-between h-48 shadow-sm">
+                                <div className="flex justify-between items-center">
+                                    <div className="w-11 h-11 rounded-2xl bg-[#ffecb3]/80 text-[#9c7100] flex items-center justify-center">
+                                        <BookOpen size={22} />
+                                    </div>
+                                    <span className="px-2.5 py-1 bg-[#ffecb3] text-[#9c7100] text-[10px] font-extrabold rounded-full tracking-wider">MATERI</span>
                                 </div>
                                 <div>
-                                    <span className="text-5xl font-extrabold text-[#9c7100] block mb-1">{materials.length}</span>
-                                    <span className="text-sm font-semibold text-slate-600">Materi Terunggah</span>
+                                    <span className="text-4xl lg:text-5xl font-extrabold text-[#9c7100] block mb-1">{materials.length}</span>
+                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Materi Terunggah</span>
                                 </div>
                             </div>
                             
-                            <div className="bg-[#f0f4ff] border border-[#d6e4ff] rounded-[24px] p-8 flex flex-col justify-between h-48">
-                                <div className="flex justify-between items-start">
-                                    <CheckSquare className="text-teal" size={28} />
-                                    <span className="px-2 py-1 bg-[#d6e4ff] text-teal text-[9px] font-bold rounded-full">AKTIF</span>
+                            <div className="bg-[#e6f4f1] border border-[#a7f3d0] rounded-[24px] p-7 flex flex-col justify-between h-48 shadow-sm">
+                                <div className="flex justify-between items-center">
+                                    <div className="w-11 h-11 rounded-2xl bg-[#a7f3d0]/70 text-[#0f5c50] flex items-center justify-center">
+                                        <CheckSquare size={22} />
+                                    </div>
+                                    <span className="px-2.5 py-1 bg-[#a7f3d0] text-[#0f5c50] text-[10px] font-extrabold rounded-full tracking-wider">SIMULASI</span>
                                 </div>
                                 <div>
-                                    <span className="text-5xl font-extrabold text-[#006b61] block mb-1">{quizzes.length}</span>
-                                    <span className="text-sm font-semibold text-slate-600">Kuis Simulasi Aktif</span>
+                                    <span className="text-4xl lg:text-5xl font-extrabold text-[#0f5c50] block mb-1">{quizzes.length}</span>
+                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Kuis Simulasi Aktif</span>
                                 </div>
                             </div>
 
-                            <div className="bg-[#fff0f3] border border-[#ffd6e0] rounded-[24px] p-8 flex flex-col justify-between h-48">
-                                <div className="flex justify-between items-start">
-                                    <FileQuestion className="text-rose-500" size={28} />
+                            <div className="bg-[#fff0f3] border border-[#ffd6e0] rounded-[24px] p-7 flex flex-col justify-between h-48 shadow-sm">
+                                <div className="flex justify-between items-center">
+                                    <div className="w-11 h-11 rounded-2xl bg-[#ffd6e0]/80 text-rose-600 flex items-center justify-center">
+                                        <FileQuestion size={22} />
+                                    </div>
+                                    <span className="px-2.5 py-1 bg-[#ffd6e0] text-rose-600 text-[10px] font-extrabold rounded-full tracking-wider">SOAL</span>
                                 </div>
                                 <div>
-                                    <span className="text-5xl font-extrabold text-rose-700 block mb-1">
+                                    <span className="text-4xl lg:text-5xl font-extrabold text-rose-700 block mb-1">
                                         {quizzes.reduce((acc, curr) => acc + (curr.questions_count || 0), 0)}
                                     </span>
-                                    <span className="text-sm font-semibold text-slate-600">Butir Pertanyaan</span>
+                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Butir Pertanyaan</span>
                                 </div>
                             </div>
                         </div>
@@ -1181,7 +1269,352 @@ export default function TeacherDashboard({ user, onNavigate, onLogout, showToast
                         )}
                     </div>
                 )}
+
+                {/* TAB: STATISTIK PENGAJARAN (Detailed) */}
+                {activeTab === 'stats-detail' && (
+                    <div className="flex flex-col gap-8 max-w-5xl mx-auto">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div>
+                                <button
+                                    onClick={() => setActiveTab('stats')}
+                                    className="text-xs font-bold text-teal hover:underline flex items-center gap-1 mb-2 cursor-pointer"
+                                >
+                                    <ArrowLeft size={14} /> Kembali ke Ringkasan
+                                </button>
+                                <h2 className="text-3xl font-extrabold text-navy tracking-tight">Statistik & Analisis Pengajaran</h2>
+                                <p className="text-sm text-slate-600 mt-1">
+                                    Pantau performa belajar, partisipasi kuis, dan keterlibatan murid jenjang <span className="font-bold text-[#0f5c50]">{user.jenjang || 'SD'}</span>.
+                                </p>
+                            </div>
+                            <div className="px-4 py-2 bg-[#f0edff] rounded-2xl border border-primary/20 text-primary text-xs font-bold">
+                                Update Real-time
+                            </div>
+                        </div>
+
+                        {/* Top Insight Cards */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Murid Bimbingan</span>
+                                <div className="my-3">
+                                    <span className="text-3xl font-extrabold text-navy">{students.length}</span>
+                                    <span className="text-xs text-slate-500 block mt-0.5">Siswa ({user.jenjang || 'SD'})</span>
+                                </div>
+                                <span className="text-[11px] font-bold text-emerald-600">✓ 100% Terverifikasi Aktif</span>
+                            </div>
+
+                            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Kuis Simulasi Siap</span>
+                                <div className="my-3">
+                                    <span className="text-3xl font-extrabold text-teal">{quizzes.length}</span>
+                                    <span className="text-xs text-slate-500 block mt-0.5">Paket Soal Terbit</span>
+                                </div>
+                                <span className="text-[11px] font-bold text-slate-500">
+                                    {quizzes.reduce((acc, curr) => acc + (curr.questions_count || 0), 0)} butir soal total
+                                </span>
+                            </div>
+
+                            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Modul Ajar Terunggah</span>
+                                <div className="my-3">
+                                    <span className="text-3xl font-extrabold text-amber-600">{materials.length}</span>
+                                    <span className="text-xs text-slate-500 block mt-0.5">Dokumen & Materi</span>
+                                </div>
+                                <span className="text-[11px] font-bold text-amber-600">Materi siap unduh</span>
+                            </div>
+
+                            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sesi Tatap Muka Online</span>
+                                <div className="my-3">
+                                    <span className="text-3xl font-extrabold text-primary">{sessionsList.length}</span>
+                                    <span className="text-xs text-slate-500 block mt-0.5">Jadwal Sesi</span>
+                                </div>
+                                <span className="text-[11px] font-bold text-primary">
+                                    {sessionsList.filter(s => s.status === 'scheduled' || s.status === 'ongoing').length} sesi aktif
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Quizzes Performance Breakdown */}
+                        <div className="bg-white border border-slate-200/80 rounded-3xl p-8 shadow-sm">
+                            <h3 className="font-extrabold text-lg text-navy mb-6">Ringkasan Paket Kuis & Kelengkapan Soal</h3>
+                            {quizzes.length === 0 ? (
+                                <p className="text-sm text-slate-400 text-center py-8">Belum ada paket kuis yang dibuat.</p>
+                            ) : (
+                                <div className="flex flex-col gap-4">
+                                    {quizzes.map(quiz => {
+                                        const count = quiz.questions_count || 0;
+                                        const percent = Math.min(100, Math.round((count / 10) * 100));
+                                        return (
+                                            <div key={quiz.id} className="p-5 bg-slate-50/70 border border-slate-150 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-3">
+                                                        <h4 className="font-bold text-navy text-sm">{quiz.judul}</h4>
+                                                        <span className="px-2.5 py-0.5 bg-white border border-slate-200 text-slate-600 text-[10px] font-bold rounded-full">
+                                                            {quiz.tipe || 'UTBK'}
+                                                        </span>
+                                                        <span className="text-xs text-slate-400 font-medium">Durasi: {quiz.durasi_menit} Menit</span>
+                                                    </div>
+                                                    <div className="w-full bg-slate-200 h-2 rounded-full mt-3 overflow-hidden">
+                                                        <div className="bg-teal h-full rounded-full transition-all duration-500" style={{ width: `${percent}%` }}></div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-4 self-end sm:self-center">
+                                                    <span className="text-xs font-extrabold text-navy">{count} Soal Aktif</span>
+                                                    <button
+                                                        onClick={() => { setActiveTab('quizzes'); fetchQuizDetails(quiz.id); }}
+                                                        className="px-4 py-2 bg-white border border-slate-200 hover:border-teal text-teal text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer"
+                                                    >
+                                                        Buka Detail
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB: JADWAL SESI BELAJAR (Task #9: Sesi Belajar Terintegrasi Guru & Murid) */}
+                {activeTab === 'sessions' && (
+                    <div className="flex flex-col gap-8 max-w-5xl mx-auto">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div>
+                                <h2 className="text-3xl font-extrabold text-navy tracking-tight">Jadwal Sesi Belajar Online</h2>
+                                <p className="text-sm text-slate-600 mt-1">
+                                    Atur jadwal tatap muka virtual (Zoom/Google Meet) untuk murid jenjang <span className="font-bold text-[#0f5c50]">{user.jenjang || 'SD'}</span>.
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setSessionFormData({
+                                        judul: '',
+                                        jenjang: user.jenjang || 'SD',
+                                        waktu_mulai: '',
+                                        waktu_selesai: '',
+                                        link_meeting: '',
+                                        deskripsi: ''
+                                    });
+                                    setIsSessionModalOpen(true);
+                                }}
+                                className="px-6 py-3.5 bg-[#0f5c50] text-white font-bold rounded-full shadow-lg hover:bg-[#0a423a] transition-all flex items-center gap-2 cursor-pointer"
+                            >
+                                <Plus size={18} /> Jadwalkan Sesi Baru
+                            </button>
+                        </div>
+
+                        {/* Sessions List */}
+                        {sessionsList.length === 0 ? (
+                            <div className="bg-white border border-slate-200/80 rounded-[32px] p-16 flex flex-col items-center justify-center text-center shadow-sm">
+                                <div className="w-16 h-16 rounded-full bg-[#f0edff] text-primary flex items-center justify-center mb-4">
+                                    <Calendar size={32} />
+                                </div>
+                                <h4 className="font-extrabold text-navy text-lg mb-1">Belum Ada Sesi Belajar</h4>
+                                <p className="text-sm text-slate-400 max-w-md mb-6">
+                                    Klik tombol "Jadwalkan Sesi Baru" untuk membuat sesi kelas tatap muka online pertama bagi siswa Anda.
+                                </p>
+                                <button
+                                    onClick={() => setIsSessionModalOpen(true)}
+                                    className="px-6 py-3 bg-[#0f5c50] text-white text-xs font-bold rounded-full hover:bg-[#0a423a] transition-colors cursor-pointer"
+                                >
+                                    Buat Jadwal Sesi
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {sessionsList.map(session => (
+                                    <div key={session.id} className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                                        <div>
+                                            <div className="flex justify-between items-start gap-2 mb-3">
+                                                <span className={`px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                                                    session.status === 'ongoing' 
+                                                        ? 'bg-rose-100 text-rose-700 border border-rose-200 animate-pulse' 
+                                                        : session.status === 'completed'
+                                                        ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                                                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                }`}>
+                                                    {session.status === 'ongoing' ? '🔴 Sedang Berlangsung' : session.status === 'completed' ? '✓ Selesai' : '📅 Terjadwal'}
+                                                </span>
+                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                                    session.jenjang === 'SMP'
+                                                        ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                                        : 'bg-[#e6f4f1] text-[#0f5c50] border border-[#a7f3d0]'
+                                                }`}>
+                                                    Jenjang {session.jenjang || 'SD'}
+                                                </span>
+                                            </div>
+
+                                            <h4 className="font-extrabold text-navy text-lg mb-2">{session.judul}</h4>
+                                            <p className="text-xs text-slate-500 mb-4 line-clamp-2">{session.deskripsi || 'Sesi pembelajaran online interaktif bersama mentor.'}</p>
+
+                                            <div className="flex flex-col gap-1.5 p-3.5 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-600 font-medium mb-4">
+                                                <div className="flex items-center gap-2">
+                                                    <Clock size={14} className="text-teal" />
+                                                    <span>
+                                                        {new Date(session.waktu_mulai).toLocaleString('id-ID', {
+                                                            weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                                        })}
+                                                        {session.waktu_selesai && ` - ${new Date(session.waktu_selesai).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-4 border-t border-slate-100 flex flex-col gap-3">
+                                            {session.link_meeting && (
+                                                <a
+                                                    href={session.link_meeting}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="w-full py-3 bg-[#0f5c50] hover:bg-[#0a423a] text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
+                                                >
+                                                    <Video size={16} /> Buka Link Meeting
+                                                </a>
+                                            )}
+
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-1.5">
+                                                    {session.status !== 'ongoing' && session.status !== 'completed' && (
+                                                        <button
+                                                            onClick={() => handleUpdateSessionStatus(session.id, 'ongoing')}
+                                                            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
+                                                        >
+                                                            Mulai Sekarang
+                                                        </button>
+                                                    )}
+                                                    {session.status === 'ongoing' && (
+                                                        <button
+                                                            onClick={() => handleUpdateSessionStatus(session.id, 'completed')}
+                                                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
+                                                        >
+                                                            Tandai Selesai
+                                                        </button>
+                                                    )}
+                                                    {session.status === 'completed' && (
+                                                        <button
+                                                            onClick={() => handleUpdateSessionStatus(session.id, 'scheduled')}
+                                                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
+                                                        >
+                                                            Jadwalkan Ulang
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                <button
+                                                    onClick={() => handleDeleteSession(session.id)}
+                                                    className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                                    title="Hapus Sesi"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
             </main>
+
+            {/* MODAL: JADWALKAN SESI BELAJAR BARU */}
+            <Modal
+                isOpen={isSessionModalOpen}
+                onClose={() => setIsSessionModalOpen(false)}
+                title="Jadwalkan Sesi Belajar Online"
+                size="md"
+            >
+                <form onSubmit={handleCreateSession} className="flex flex-col gap-4 text-left">
+                    <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Judul / Topik Sesi</label>
+                        <input
+                            required
+                            type="text"
+                            placeholder="Contoh: Sesi Pendalaman Matematika Pecahan & Aljabar"
+                            value={sessionFormData.judul}
+                            onChange={(e) => setSessionFormData({ ...sessionFormData, judul: e.target.value })}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-navy focus:outline-none focus:border-teal"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs font-bold text-slate-700 block mb-1">Jenjang Target</label>
+                            <select
+                                value={sessionFormData.jenjang}
+                                onChange={(e) => setSessionFormData({ ...sessionFormData, jenjang: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-navy focus:outline-none focus:border-teal"
+                            >
+                                <option value="SD">SD (Sekolah Dasar)</option>
+                                <option value="SMP">SMP (Sekolah Menengah)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-700 block mb-1">Link Meeting (Zoom / Meet)</label>
+                            <input
+                                required
+                                type="url"
+                                placeholder="https://meet.google.com/xyz..."
+                                value={sessionFormData.link_meeting}
+                                onChange={(e) => setSessionFormData({ ...sessionFormData, link_meeting: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-navy focus:outline-none focus:border-teal"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs font-bold text-slate-700 block mb-1">Waktu Mulai</label>
+                            <input
+                                required
+                                type="datetime-local"
+                                value={sessionFormData.waktu_mulai}
+                                onChange={(e) => setSessionFormData({ ...sessionFormData, waktu_mulai: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-navy focus:outline-none focus:border-teal"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-700 block mb-1">Waktu Selesai (Opsional)</label>
+                            <input
+                                type="datetime-local"
+                                value={sessionFormData.waktu_selesai}
+                                onChange={(e) => setSessionFormData({ ...sessionFormData, waktu_selesai: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-navy focus:outline-none focus:border-teal"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Deskripsi / Agenda Pembelajaran</label>
+                        <textarea
+                            rows={3}
+                            placeholder="Tuliskan agenda atau persiapan materi yang perlu dibawa siswa..."
+                            value={sessionFormData.deskripsi}
+                            onChange={(e) => setSessionFormData({ ...sessionFormData, deskripsi: e.target.value })}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-navy focus:outline-none focus:border-teal resize-none"
+                        />
+                    </div>
+
+                    <div className="pt-3 flex justify-end gap-3 border-t border-slate-100 mt-2">
+                        <button
+                            type="button"
+                            onClick={() => setIsSessionModalOpen(false)}
+                            className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={sessionLoading}
+                            className="px-6 py-2.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white text-xs font-bold rounded-xl shadow-md transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                        >
+                            {sessionLoading ? <Loader className="animate-spin" size={14} /> : <Calendar size={14} />}
+                            Simpan & Publikasikan Sesi
+                        </button>
+                    </div>
+                </form>
+            </Modal>
 
             {/* CHAT MESSAGING DRAWER */}
             <ChatDrawer

@@ -3,13 +3,14 @@ import { api } from '../utils/api';
 import Logo from './Logo';
 import ChatDrawer from './ChatDrawer';
 import NotificationDropdown from './NotificationDropdown';
+import Modal from './common/Modal';
 import { 
     Users, UserPlus, LogOut, Check, X, Key, Search, Activity, BookOpen, Users2, Shield,
-    LayoutDashboard, Settings, Bell, Calendar, TrendingUp, UserCheck, UserX, SlidersHorizontal, Plus, Edit2, Ban, GraduationCap, Clock, MoreVertical, Eye, EyeOff, Info, User, Mail, Lock, Star, History, LogIn, ChevronRight, BarChart3, Video, Link, MessageSquare, CheckCircle2, AlertCircle, FileText, Globe
+    LayoutDashboard, Settings, Bell, Calendar, TrendingUp, UserCheck, UserX, SlidersHorizontal, Plus, Edit2, Ban, GraduationCap, Clock, MoreVertical, Eye, EyeOff, Info, User, Mail, Lock, Star, History, LogIn, ChevronRight, BarChart3, Video, Link, MessageSquare, CheckCircle2, AlertCircle, FileText, Globe, Upload, Image as ImageIcon, Trash2, CheckSquare, XCircle, ThumbsUp, ThumbsDown, Loader
 } from 'lucide-react';
 
 export default function AdminPage({ onLogout, user }) {
-    const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'guru' | 'laporan' | 'sesi' | 'pengaturan'
+    const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'guru' | 'laporan' | 'sesi' | 'testimonials' | 'pengaturan'
     const [stats, setStats] = useState({ siswa_count: 0, guru_active_count: 0, guru_inactive_count: 0, sessions_scheduled_count: 0, sessions_completed_count: 0 });
     const [gurus, setGurus] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -35,6 +36,22 @@ export default function AdminPage({ onLogout, user }) {
     const [sessionLoading, setSessionLoading] = useState(false);
     const [sessionsList, setSessionsList] = useState([]);
 
+    // Testimonials Moderation State
+    const [testimonialsList, setTestimonialsList] = useState([]);
+    const [loadingTestimonials, setLoadingTestimonials] = useState(false);
+    const [testimonialFilter, setTestimonialFilter] = useState('all'); // 'all' | 'pending' | 'approved' | 'rejected'
+    const [isTestimonialModalOpen, setIsTestimonialModalOpen] = useState(false);
+    const [testimonialFormData, setTestimonialFormData] = useState({
+        parent_name: '',
+        child_role: '',
+        jenjang: 'SD',
+        rating: 5,
+        message: '',
+        avatar_url: '',
+        status: 'approved',
+    });
+    const [testimonialFormLoading, setTestimonialFormLoading] = useState(false);
+
     // Reports state
     const [reportsData, setReportsData] = useState(null);
     const [reportFilter, setReportFilter] = useState({ range: 'monthly', jenjang: '', guru_id: '' });
@@ -45,9 +62,19 @@ export default function AdminPage({ onLogout, user }) {
         hero_title: '',
         hero_subtitle: '',
         hero_image_url: '',
-        active_students_badge: '500+',
+        active_students_badge: '520+',
+        active_students_mode: 'auto', // 'auto' | 'custom'
+        program_math_title: 'Mastering Mathematics',
+        program_math_badge: 'SD & SMP',
+        program_math_desc: 'Membangun logika berpikir kritis, pemahaman konsep mendalam tanpa rumus hafalan kaku, dan kesiapan olimpiade.',
+        program_math_image: '',
+        program_eng_title: 'English Fluency Path',
+        program_eng_badge: 'Semua Jenjang',
+        program_eng_desc: 'Pembiasaan percakapan aktif, aksen natural, dan kurikulum standar global berbasis Cambridge framework.',
+        program_eng_image: '',
     });
     const [savingSettings, setSavingSettings] = useState(false);
+    const [uploadingKey, setUploadingKey] = useState(null);
 
     // Drawer / Modal states for Notifications & Messages
     const [isChatOpen, setIsChatOpen] = useState(false);
@@ -64,6 +91,8 @@ export default function AdminPage({ onLogout, user }) {
         } else if (activeTab === 'sesi') {
             fetchSessions();
             fetchGurus();
+        } else if (activeTab === 'testimonials') {
+            fetchTestimonials();
         } else if (activeTab === 'pengaturan') {
             fetchSettings();
         }
@@ -116,6 +145,80 @@ export default function AdminPage({ onLogout, user }) {
             setSessionsList(data || []);
         } catch (error) {
             console.error('Failed to fetch sessions', error);
+        }
+    };
+
+    const fetchTestimonials = async () => {
+        setLoadingTestimonials(true);
+        try {
+            const data = await api.get('/admin/testimonials');
+            setTestimonialsList(data || []);
+        } catch (error) {
+            console.error('Failed to fetch testimonials', error);
+        } finally {
+            setLoadingTestimonials(false);
+        }
+    };
+
+    const handleTestimonialStatus = async (id, status) => {
+        try {
+            await api.patch(`/admin/testimonials/${id}/status`, { status });
+            fetchTestimonials();
+        } catch (error) {
+            alert('Gagal mengubah status testimoni: ' + error.message);
+        }
+    };
+
+    const handleDeleteTestimonial = async (id) => {
+        if (!confirm('Hapus testimoni ini secara permanen?')) return;
+        try {
+            await api.delete(`/admin/testimonials/${id}`);
+            fetchTestimonials();
+        } catch (error) {
+            alert('Gagal menghapus testimoni: ' + error.message);
+        }
+    };
+
+    const handleCreateTestimonial = async (e) => {
+        e.preventDefault();
+        setTestimonialFormLoading(true);
+        try {
+            await api.post('/admin/testimonials', testimonialFormData);
+            alert('Testimoni berhasil ditambahkan!');
+            setIsTestimonialModalOpen(false);
+            setTestimonialFormData({
+                parent_name: '',
+                child_role: '',
+                jenjang: 'SD',
+                rating: 5,
+                message: '',
+                avatar_url: '',
+                status: 'approved',
+            });
+            fetchTestimonials();
+        } catch (error) {
+            alert('Gagal membuat testimoni: ' + error.message);
+        } finally {
+            setTestimonialFormLoading(false);
+        }
+    };
+
+    const handleUploadImage = async (e, keyName) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setUploadingKey(keyName);
+        try {
+            const formDataUpload = new FormData();
+            formDataUpload.append('image', file);
+            const res = await api.post('/admin/upload-image', formDataUpload);
+            if (res && res.url) {
+                setSiteSettings(prev => ({ ...prev, [keyName]: res.url }));
+            }
+        } catch (err) {
+            alert('Gagal mengunggah foto: ' + err.message);
+        } finally {
+            setUploadingKey(null);
         }
     };
 
@@ -275,6 +378,17 @@ export default function AdminPage({ onLogout, user }) {
                             }`}
                         >
                             <Calendar size={18} /> Jadwal Sesi Belajar
+                        </button>
+
+                        <button
+                            onClick={() => { setActiveTab('testimonials'); setIsFormOpen(false); }}
+                            className={`w-full text-left px-4 py-3.5 rounded-2xl text-xs font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                                activeTab === 'testimonials' 
+                                    ? 'bg-[#f0fbf9] text-[#0f5c50] shadow-sm' 
+                                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                            }`}
+                        >
+                            <MessageSquare size={18} /> Moderasi Testimoni
                         </button>
 
                         <button
@@ -856,59 +970,391 @@ export default function AdminPage({ onLogout, user }) {
                         </div>
                     )}
 
-                    {/* TAB: PENGATURAN LANDING PAGE */}
-                    {activeTab === 'pengaturan' && (
-                        <div className="max-w-3xl mx-auto flex flex-col gap-8 text-left">
-                            <div>
-                                <h2 className="text-3xl font-extrabold text-navy tracking-tight mb-1">Pengaturan Halaman Landing</h2>
-                                <p className="text-slate-500 text-sm">Kelola teks utama, gambar hero, dan badge statistik pada landing page publik.</p>
+                    {/* TAB: MODERASI TESTIMONI (Task #4: Moderasi Testimoni Orang Tua) */}
+                    {activeTab === 'testimonials' && (
+                        <div className="max-w-6xl mx-auto flex flex-col gap-8 text-left">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div>
+                                    <h2 className="text-3xl font-extrabold text-navy tracking-tight mb-1">Moderasi Testimoni Orang Tua</h2>
+                                    <p className="text-slate-500 text-sm">Tinjau, setujui, tolak, atau kelola ulasan orang tua murid yang tampil di landing page.</p>
+                                </div>
+                                <button 
+                                    onClick={() => {
+                                        setTestimonialFormData({
+                                            parent_name: '',
+                                            child_role: '',
+                                            jenjang: 'SD',
+                                            rating: 5,
+                                            message: '',
+                                            avatar_url: '',
+                                            status: 'approved',
+                                        });
+                                        setIsTestimonialModalOpen(true);
+                                    }}
+                                    className="px-6 py-3.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white text-xs font-bold rounded-2xl transition-colors cursor-pointer shadow-md flex items-center gap-2"
+                                >
+                                    <Plus size={16} /> Tambah Testimoni Baru
+                                </button>
                             </div>
 
-                            <form onSubmit={handleSaveSettings} className="bg-white border border-slate-200/80 p-8 rounded-3xl shadow-sm flex flex-col gap-6">
-                                <div>
-                                    <label className="text-xs font-bold text-navy block mb-2">Judul Hero (Headline)</label>
-                                    <input
-                                        type="text"
-                                        value={siteSettings.hero_title}
-                                        onChange={(e) => setSiteSettings({ ...siteSettings, hero_title: e.target.value })}
-                                        className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:outline-none focus:border-[#0f5c50]"
-                                        placeholder="Cerdaskan Si Kecil dengan Adab & Prestasi"
-                                    />
-                                </div>
+                            {/* Filter Status Tabs */}
+                            <div className="flex gap-2 bg-white p-1.5 rounded-2xl border border-slate-200/80 w-fit">
+                                {[
+                                    { id: 'all', label: 'Semua Testimoni' },
+                                    { id: 'pending', label: `Menunggu (${testimonialsList.filter(t => t.status === 'pending').length})` },
+                                    { id: 'approved', label: 'Disetujui' },
+                                    { id: 'rejected', label: 'Ditolak' }
+                                ].map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setTestimonialFilter(tab.id)}
+                                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                            testimonialFilter === tab.id
+                                                ? 'bg-[#0f5c50] text-white shadow-sm'
+                                                : 'text-slate-600 hover:text-navy hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
 
-                                <div>
-                                    <label className="text-xs font-bold text-navy block mb-2">Deskripsi Hero</label>
-                                    <textarea
-                                        rows={3}
-                                        value={siteSettings.hero_subtitle}
-                                        onChange={(e) => setSiteSettings({ ...siteSettings, hero_subtitle: e.target.value })}
-                                        className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:outline-none focus:border-[#0f5c50]"
-                                        placeholder="Fokus pada penguasaan Matematika & Bahasa Inggris..."
-                                    />
+                            {/* Testimonials Table */}
+                            <div className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden shadow-sm">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-xs text-slate-600">
+                                        <thead className="bg-[#f8fafc] text-[10px] uppercase font-bold text-slate-400 border-b border-slate-100 tracking-wider">
+                                            <tr>
+                                                <th className="px-5 py-4">Orang Tua / Wali</th>
+                                                <th className="px-5 py-4">Jenjang & Rating</th>
+                                                <th className="px-5 py-4">Pesan Testimoni</th>
+                                                <th className="px-5 py-4 text-center">Status</th>
+                                                <th className="px-5 py-4 text-right">Aksi Moderasi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {testimonialsList.filter(t => testimonialFilter === 'all' || t.status === testimonialFilter).length === 0 ? (
+                                                <tr>
+                                                    <td colSpan="5" className="px-5 py-12 text-center text-slate-400">
+                                                        {loadingTestimonials ? 'Memuat data testimoni...' : 'Belum ada data testimoni pada filter ini.'}
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                testimonialsList
+                                                    .filter(t => testimonialFilter === 'all' || t.status === testimonialFilter)
+                                                    .map(item => (
+                                                        <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                                                            <td className="px-5 py-5 flex items-center gap-3">
+                                                                <div className="w-10 h-10 rounded-full overflow-hidden bg-[#e6f4f1] text-[#0f5c50] font-bold flex items-center justify-center shrink-0 border border-[#a7f3d0]">
+                                                                    {item.avatar_url ? (
+                                                                        <img src={item.avatar_url} alt={item.parent_name} className="w-full h-full object-cover" />
+                                                                    ) : (
+                                                                        <span>{item.parent_name.substring(0, 2).toUpperCase()}</span>
+                                                                    )}
+                                                                </div>
+                                                                <div>
+                                                                    <span className="font-bold text-navy text-sm block">{item.parent_name}</span>
+                                                                    <span className="text-[10px] text-slate-400 block">{item.child_role || 'Orang Tua Siswa'}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-5 py-5">
+                                                                <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold mb-1.5 ${
+                                                                    item.jenjang === 'SMP' ? 'bg-indigo-50 text-indigo-700' : 'bg-[#e6f4f1] text-[#0f5c50]'
+                                                                }`}>
+                                                                    Jenjang {item.jenjang || 'SD'}
+                                                                </span>
+                                                                <div className="flex items-center text-amber-400">
+                                                                    {[...Array(item.rating || 5)].map((_, i) => (
+                                                                        <Star key={i} size={12} fill="currentColor" />
+                                                                    ))}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-5 py-5 max-w-md">
+                                                                <p className="text-xs text-slate-700 italic leading-relaxed">"{item.message}"</p>
+                                                                <span className="text-[10px] text-slate-400 block mt-1">
+                                                                    {new Date(item.created_at).toLocaleString('id-ID')}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-5 py-5 text-center">
+                                                                <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold ${
+                                                                    item.status === 'approved' 
+                                                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                                                                        : item.status === 'pending'
+                                                                        ? 'bg-amber-50 text-amber-700 border border-amber-200 animate-pulse'
+                                                                        : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                                                }`}>
+                                                                    {item.status === 'approved' ? '✓ Disetujui' : item.status === 'pending' ? '⏳ Menunggu' : '✕ Ditolak'}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-5 py-5 text-right">
+                                                                <div className="flex items-center justify-end gap-2">
+                                                                    {item.status !== 'approved' && (
+                                                                        <button
+                                                                            onClick={() => handleTestimonialStatus(item.id, 'approved')}
+                                                                            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+                                                                            title="Setujui dan tampilkan di landing page"
+                                                                        >
+                                                                            <Check size={14} /> Setujui
+                                                                        </button>
+                                                                    )}
+                                                                    {item.status !== 'rejected' && (
+                                                                        <button
+                                                                            onClick={() => handleTestimonialStatus(item.id, 'rejected')}
+                                                                            className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+                                                                            title="Tolak testimoni"
+                                                                        >
+                                                                            <X size={14} /> Tolak
+                                                                        </button>
+                                                                    )}
+                                                                    <button
+                                                                        onClick={() => handleDeleteTestimonial(item.id)}
+                                                                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                                                                        title="Hapus permanen"
+                                                                    >
+                                                                        <Trash2 size={16} />
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
+                            </div>
+                        </div>
+                    )}
 
-                                <div>
-                                    <label className="text-xs font-bold text-navy block mb-2">URL Foto Hero Image</label>
-                                    <input
-                                        type="url"
-                                        value={siteSettings.hero_image_url}
-                                        onChange={(e) => setSiteSettings({ ...siteSettings, hero_image_url: e.target.value })}
-                                        className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:outline-none focus:border-[#0f5c50]"
-                                        placeholder="https://..."
-                                    />
-                                    {siteSettings.hero_image_url && (
-                                        <div className="mt-3 w-48 h-28 rounded-2xl overflow-hidden border border-slate-200">
-                                            <img src={siteSettings.hero_image_url} alt="Preview" className="w-full h-full object-cover" />
+                    {/* TAB: PENGATURAN LANDING PAGE (Task #1 & #3: Manajemen Foto, Counter, Program Unggulan) */}
+                    {activeTab === 'pengaturan' && (
+                        <div className="max-w-4xl mx-auto flex flex-col gap-8 text-left">
+                            <div>
+                                <h2 className="text-3xl font-extrabold text-navy tracking-tight mb-1">Pengaturan & Manajemen Foto Landing</h2>
+                                <p className="text-slate-500 text-sm">Kelola foto hero, mode counter siswa aktif, program unggulan, dan foto banner landing page publik.</p>
+                            </div>
+
+                            <form onSubmit={handleSaveSettings} className="flex flex-col gap-8">
+                                {/* SECTION 1: HERO BANNER & COUNTER */}
+                                <div className="bg-white border border-slate-200/80 p-8 rounded-3xl shadow-sm flex flex-col gap-6">
+                                    <h3 className="font-extrabold text-navy text-lg border-b border-slate-100 pb-3 flex items-center gap-2">
+                                        <Globe size={20} className="text-[#0f5c50]" /> Hero Banner & Counter Siswa
+                                    </h3>
+
+                                    <div>
+                                        <label className="text-xs font-bold text-navy block mb-2">Judul Hero (Headline)</label>
+                                        <input
+                                            type="text"
+                                            value={siteSettings.hero_title || ''}
+                                            onChange={(e) => setSiteSettings({ ...siteSettings, hero_title: e.target.value })}
+                                            className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:outline-none focus:border-[#0f5c50]"
+                                            placeholder="Cerdaskan Si Kecil dengan Adab & Prestasi"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs font-bold text-navy block mb-2">Deskripsi Hero</label>
+                                        <textarea
+                                            rows={3}
+                                            value={siteSettings.hero_subtitle || ''}
+                                            onChange={(e) => setSiteSettings({ ...siteSettings, hero_subtitle: e.target.value })}
+                                            className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:outline-none focus:border-[#0f5c50]"
+                                            placeholder="Fokus pada penguasaan Matematika & Bahasa Inggris..."
+                                        />
+                                    </div>
+
+                                    {/* Hero Photo Uploader */}
+                                    <div>
+                                        <label className="text-xs font-bold text-navy block mb-2">Foto Hero Banner</label>
+                                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                            {siteSettings.hero_image_url ? (
+                                                <div className="w-36 h-24 rounded-2xl overflow-hidden border border-slate-200 shrink-0 bg-slate-50">
+                                                    <img src={siteSettings.hero_image_url} alt="Hero" className="w-full h-full object-cover" />
+                                                </div>
+                                            ) : (
+                                                <div className="w-36 h-24 rounded-2xl border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 shrink-0 bg-slate-50">
+                                                    <ImageIcon size={24} />
+                                                    <span className="text-[10px] mt-1">Default Photo</span>
+                                                </div>
+                                            )}
+                                            <div className="flex-1 flex flex-col gap-2 w-full">
+                                                <label className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer w-fit flex items-center gap-2">
+                                                    <Upload size={14} /> {uploadingKey === 'hero_image_url' ? 'Mengunggah...' : 'Unggah Foto Baru'}
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        onChange={(e) => handleUploadImage(e, 'hero_image_url')}
+                                                        className="hidden"
+                                                    />
+                                                </label>
+                                                <input
+                                                    type="url"
+                                                    value={siteSettings.hero_image_url || ''}
+                                                    onChange={(e) => setSiteSettings({ ...siteSettings, hero_image_url: e.target.value })}
+                                                    className="w-full px-4 py-2 border border-slate-200 rounded-xl text-xs text-slate-600 focus:outline-none focus:border-[#0f5c50]"
+                                                    placeholder="Atau tempel URL gambar..."
+                                                />
+                                            </div>
                                         </div>
-                                    )}
+                                    </div>
+
+                                    {/* Counter Siswa Aktif Settings */}
+                                    <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col gap-4">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <span className="font-bold text-navy text-xs block">Mode Counter Siswa Aktif (Task #1)</span>
+                                                <span className="text-[11px] text-slate-500">Pilih apakah angka badge dihitung real dari database atau override manual.</span>
+                                            </div>
+                                            <select
+                                                value={siteSettings.active_students_mode || 'auto'}
+                                                onChange={(e) => setSiteSettings({ ...siteSettings, active_students_mode: e.target.value })}
+                                                className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-navy focus:border-[#0f5c50]"
+                                            >
+                                                <option value="auto">Otomatis dari DB ({stats.siswa_count} Siswa)</option>
+                                                <option value="custom">Kustom Manual</option>
+                                            </select>
+                                        </div>
+
+                                        {siteSettings.active_students_mode === 'custom' && (
+                                            <div>
+                                                <label className="text-[11px] font-bold text-slate-600 block mb-1">Teks Badge Kustom</label>
+                                                <input
+                                                    type="text"
+                                                    value={siteSettings.active_students_badge || '520+'}
+                                                    onChange={(e) => setSiteSettings({ ...siteSettings, active_students_badge: e.target.value })}
+                                                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-navy focus:border-[#0f5c50]"
+                                                    placeholder="Contoh: 520+ atau 1,200+"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* SECTION 2: PROGRAM UNGGULAN KAMI (Task #3) */}
+                                <div className="bg-white border border-slate-200/80 p-8 rounded-3xl shadow-sm flex flex-col gap-6">
+                                    <h3 className="font-extrabold text-navy text-lg border-b border-slate-100 pb-3 flex items-center gap-2">
+                                        <BookOpen size={20} className="text-[#0f5c50]" /> Program Unggulan Kami (Cards Editor)
+                                    </h3>
+
+                                    {/* Program 1: Mathematics */}
+                                    <div className="p-6 bg-slate-50 rounded-3xl border border-slate-200 flex flex-col gap-4">
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-extrabold text-navy text-sm">Program 1: Matematika</span>
+                                            <span className="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-full text-[10px] font-extrabold">Card 1</span>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[11px] font-bold text-slate-600 block mb-1">Judul Program</label>
+                                                <input
+                                                    type="text"
+                                                    value={siteSettings.program_math_title || 'Mastering Mathematics'}
+                                                    onChange={(e) => setSiteSettings({ ...siteSettings, program_math_title: e.target.value })}
+                                                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-navy focus:border-[#0f5c50]"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[11px] font-bold text-slate-600 block mb-1">Badge Jenjang</label>
+                                                <input
+                                                    type="text"
+                                                    value={siteSettings.program_math_badge || 'SD & SMP'}
+                                                    onChange={(e) => setSiteSettings({ ...siteSettings, program_math_badge: e.target.value })}
+                                                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-navy focus:border-[#0f5c50]"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-[11px] font-bold text-slate-600 block mb-1">Deskripsi Singkat</label>
+                                            <textarea
+                                                rows={2}
+                                                value={siteSettings.program_math_desc || ''}
+                                                onChange={(e) => setSiteSettings({ ...siteSettings, program_math_desc: e.target.value })}
+                                                className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-navy focus:border-[#0f5c50]"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[11px] font-bold text-slate-600 block mb-1">Foto Program Matematika</label>
+                                            <div className="flex items-center gap-4">
+                                                {siteSettings.program_math_image ? (
+                                                    <div className="w-24 h-16 rounded-xl overflow-hidden border border-slate-200 bg-white">
+                                                        <img src={siteSettings.program_math_image} alt="Math" className="w-full h-full object-cover" />
+                                                    </div>
+                                                ) : null}
+                                                <label className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-2">
+                                                    <Upload size={14} /> {uploadingKey === 'program_math_image' ? 'Mengunggah...' : 'Upload Foto Matematika'}
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        onChange={(e) => handleUploadImage(e, 'program_math_image')}
+                                                        className="hidden"
+                                                    />
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Program 2: English */}
+                                    <div className="p-6 bg-slate-50 rounded-3xl border border-slate-200 flex flex-col gap-4">
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-extrabold text-navy text-sm">Program 2: Bahasa Inggris</span>
+                                            <span className="px-2.5 py-1 bg-teal/20 text-[#0f5c50] rounded-full text-[10px] font-extrabold">Card 2</span>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[11px] font-bold text-slate-600 block mb-1">Judul Program</label>
+                                                <input
+                                                    type="text"
+                                                    value={siteSettings.program_eng_title || 'English Fluency Path'}
+                                                    onChange={(e) => setSiteSettings({ ...siteSettings, program_eng_title: e.target.value })}
+                                                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-navy focus:border-[#0f5c50]"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[11px] font-bold text-slate-600 block mb-1">Badge Jenjang</label>
+                                                <input
+                                                    type="text"
+                                                    value={siteSettings.program_eng_badge || 'Semua Jenjang'}
+                                                    onChange={(e) => setSiteSettings({ ...siteSettings, program_eng_badge: e.target.value })}
+                                                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-navy focus:border-[#0f5c50]"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-[11px] font-bold text-slate-600 block mb-1">Deskripsi Singkat</label>
+                                            <textarea
+                                                rows={2}
+                                                value={siteSettings.program_eng_desc || ''}
+                                                onChange={(e) => setSiteSettings({ ...siteSettings, program_eng_desc: e.target.value })}
+                                                className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-navy focus:border-[#0f5c50]"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[11px] font-bold text-slate-600 block mb-1">Foto Program Bahasa Inggris</label>
+                                            <div className="flex items-center gap-4">
+                                                {siteSettings.program_eng_image ? (
+                                                    <div className="w-24 h-16 rounded-xl overflow-hidden border border-slate-200 bg-white">
+                                                        <img src={siteSettings.program_eng_image} alt="English" className="w-full h-full object-cover" />
+                                                    </div>
+                                                ) : null}
+                                                <label className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-2">
+                                                    <Upload size={14} /> {uploadingKey === 'program_eng_image' ? 'Mengunggah...' : 'Upload Foto Bahasa Inggris'}
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        onChange={(e) => handleUploadImage(e, 'program_eng_image')}
+                                                        className="hidden"
+                                                    />
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <button
                                     type="submit"
                                     disabled={savingSettings}
-                                    className="px-6 py-3.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white font-bold rounded-2xl text-xs shadow-md transition-colors self-start cursor-pointer"
+                                    className="px-8 py-4 bg-[#0f5c50] hover:bg-[#0a423a] text-white font-bold rounded-2xl text-xs shadow-lg transition-all self-start cursor-pointer flex items-center gap-2"
                                 >
-                                    {savingSettings ? 'Menyimpan...' : 'Simpan Pengaturan Landing'}
+                                    {savingSettings ? <Loader className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
+                                    Simpan Semua Pengaturan Landing
                                 </button>
                             </form>
                         </div>
@@ -916,193 +1362,281 @@ export default function AdminPage({ onLogout, user }) {
                 </div>
             </main>
 
-            {/* MODAL: TAMBAH SESI (Single Consolidated Flow) */}
-            {isSessionModalOpen && (
-                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl border border-slate-200 text-left">
-                        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-[#f8fafc]">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-2xl bg-[#e6f7f4] text-[#0f5c50] flex items-center justify-center">
-                                    <Calendar size={20} />
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-base text-navy">Jadwalkan Sesi Belajar Baru</h3>
-                                    <p className="text-xs text-slate-400">Hubungkan sesi tatap muka langsung ke kalender siswa & guru.</p>
-                                </div>
-                            </div>
-                            <button onClick={() => setIsSessionModalOpen(false)} className="text-slate-400 hover:text-navy cursor-pointer">
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleCreateSession} className="p-6 flex flex-col gap-4">
-                            <div>
-                                <label className="text-xs font-bold text-navy block mb-1">Guru Pengajar <span className="text-rose-500">*</span></label>
-                                <select
-                                    required
-                                    value={sessionFormData.guru_id}
-                                    onChange={(e) => setSessionFormData({ ...sessionFormData, guru_id: e.target.value })}
-                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50] cursor-pointer"
-                                >
-                                    <option value="">-- Pilih Guru --</option>
-                                    {gurus.map(g => (
-                                        <option key={g.id} value={g.id}>{g.name} (Guru {g.jenjang || 'SD'})</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-xs font-bold text-navy block mb-1">Jenjang <span className="text-rose-500">*</span></label>
-                                    <select
-                                        value={sessionFormData.jenjang}
-                                        onChange={(e) => setSessionFormData({ ...sessionFormData, jenjang: e.target.value })}
-                                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50] cursor-pointer"
-                                    >
-                                        <option value="SD">Jenjang SD</option>
-                                        <option value="SMP">Jenjang SMP</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-navy block mb-1">Waktu Mulai <span className="text-rose-500">*</span></label>
-                                    <input
-                                        required
-                                        type="datetime-local"
-                                        value={sessionFormData.waktu_mulai}
-                                        onChange={(e) => setSessionFormData({ ...sessionFormData, waktu_mulai: e.target.value })}
-                                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="text-xs font-bold text-navy block mb-1">Judul Sesi <span className="text-rose-500">*</span></label>
-                                <input
-                                    required
-                                    type="text"
-                                    placeholder="Contoh: Pendalaman Materi Logika Aljabar"
-                                    value={sessionFormData.judul}
-                                    onChange={(e) => setSessionFormData({ ...sessionFormData, judul: e.target.value })}
-                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="text-xs font-bold text-navy block mb-1">Link Meeting (Google Meet / Zoom)</label>
-                                <input
-                                    type="url"
-                                    placeholder="https://meet.google.com/..."
-                                    value={sessionFormData.link_meeting}
-                                    onChange={(e) => setSessionFormData({ ...sessionFormData, link_meeting: e.target.value })}
-                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
-                                />
-                            </div>
-
-                            <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-100">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsSessionModalOpen(false)}
-                                    className="px-5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
-                                >
-                                    Batal
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={sessionLoading}
-                                    className="px-6 py-2.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white rounded-xl text-xs font-bold shadow-md cursor-pointer disabled:opacity-50"
-                                >
-                                    {sessionLoading ? 'Menyimpan...' : 'Simpan Jadwal Sesi'}
-                                </button>
-                            </div>
-                        </form>
+            {/* MODAL: TAMBAH SESI (Standardized) */}
+            <Modal
+                isOpen={isSessionModalOpen}
+                onClose={() => setIsSessionModalOpen(false)}
+                title="Jadwalkan Sesi Belajar Baru"
+                size="md"
+            >
+                <form onSubmit={handleCreateSession} className="flex flex-col gap-4 text-left">
+                    <div>
+                        <label className="text-xs font-bold text-navy block mb-1">Guru Pengajar <span className="text-rose-500">*</span></label>
+                        <select
+                            required
+                            value={sessionFormData.guru_id}
+                            onChange={(e) => setSessionFormData({ ...sessionFormData, guru_id: e.target.value })}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50] cursor-pointer"
+                        >
+                            <option value="">-- Pilih Guru --</option>
+                            {gurus.map(g => (
+                                <option key={g.id} value={g.id}>{g.name} (Guru {g.jenjang || 'SD'})</option>
+                            ))}
+                        </select>
                     </div>
-                </div>
-            )}
 
-            {/* MODAL: CREATE / EDIT GURU */}
-            {isFormOpen && (
-                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl border border-slate-200 text-left">
-                        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-[#f8fafc]">
-                            <div>
-                                <h3 className="font-bold text-base text-navy">{editGuru ? 'Edit Akun Guru' : 'Buat Akun Guru Baru'}</h3>
-                                <p className="text-xs text-slate-400">Lengkapi data profil dan keamanan akun tenaga pengajar.</p>
-                            </div>
-                            <button onClick={() => setIsFormOpen(false)} className="text-slate-400 hover:text-navy cursor-pointer">
-                                <X size={20} />
-                            </button>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-xs font-bold text-navy block mb-1">Jenjang <span className="text-rose-500">*</span></label>
+                            <select
+                                value={sessionFormData.jenjang}
+                                onChange={(e) => setSessionFormData({ ...sessionFormData, jenjang: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50] cursor-pointer"
+                            >
+                                <option value="SD">Jenjang SD</option>
+                                <option value="SMP">Jenjang SMP</option>
+                            </select>
                         </div>
-
-                        <form onSubmit={handleSubmitForm} className="p-6 flex flex-col gap-4">
-                            <div>
-                                <label className="text-xs font-bold text-navy block mb-1">Nama Lengkap Guru <span className="text-rose-500">*</span></label>
-                                <input
-                                    required
-                                    type="text"
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-xs font-bold text-navy block mb-1">Email <span className="text-rose-500">*</span></label>
-                                    <input
-                                        required
-                                        type="email"
-                                        value={formData.email}
-                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-navy block mb-1">Jenjang Ajar <span className="text-rose-500">*</span></label>
-                                    <select
-                                        value={formData.jenjang}
-                                        onChange={(e) => setFormData({ ...formData, jenjang: e.target.value })}
-                                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50] cursor-pointer"
-                                    >
-                                        <option value="SD">Guru SD</option>
-                                        <option value="SMP">Guru SMP</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="text-xs font-bold text-navy block mb-1">
-                                    {editGuru ? 'Password Baru (Kosongkan jika tidak diubah)' : 'Kata Sandi Awal *'}
-                                </label>
-                                <input
-                                    type="password"
-                                    required={!editGuru}
-                                    placeholder={editGuru ? '••••••••' : 'Minimal 6 karakter'}
-                                    value={formData.password}
-                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
-                                />
-                            </div>
-
-                            <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-100">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsFormOpen(false)}
-                                    className="px-5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
-                                >
-                                    Batal
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={formLoading}
-                                    className="px-6 py-2.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white rounded-xl text-xs font-bold shadow-md cursor-pointer disabled:opacity-50"
-                                >
-                                    {formLoading ? 'Menyimpan...' : 'Simpan Akun Guru'}
-                                </button>
-                            </div>
-                        </form>
+                        <div>
+                            <label className="text-xs font-bold text-navy block mb-1">Waktu Mulai <span className="text-rose-500">*</span></label>
+                            <input
+                                required
+                                type="datetime-local"
+                                value={sessionFormData.waktu_mulai}
+                                onChange={(e) => setSessionFormData({ ...sessionFormData, waktu_mulai: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                            />
+                        </div>
                     </div>
-                </div>
-            )}
+
+                    <div>
+                        <label className="text-xs font-bold text-navy block mb-1">Judul Sesi <span className="text-rose-500">*</span></label>
+                        <input
+                            required
+                            type="text"
+                            placeholder="Contoh: Pendalaman Materi Logika Aljabar"
+                            value={sessionFormData.judul}
+                            onChange={(e) => setSessionFormData({ ...sessionFormData, judul: e.target.value })}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold text-navy block mb-1">Link Meeting (Google Meet / Zoom)</label>
+                        <input
+                            type="url"
+                            placeholder="https://meet.google.com/..."
+                            value={sessionFormData.link_meeting}
+                            onChange={(e) => setSessionFormData({ ...sessionFormData, link_meeting: e.target.value })}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={() => setIsSessionModalOpen(false)}
+                            className="px-5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={sessionLoading}
+                            className="px-6 py-2.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white rounded-xl text-xs font-bold shadow-md cursor-pointer disabled:opacity-50"
+                        >
+                            {sessionLoading ? 'Menyimpan...' : 'Simpan Jadwal Sesi'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* MODAL: CREATE / EDIT GURU (Standardized) */}
+            <Modal
+                isOpen={isFormOpen}
+                onClose={() => setIsFormOpen(false)}
+                title={editGuru ? 'Edit Akun Guru' : 'Buat Akun Guru Baru'}
+                size="md"
+            >
+                <form onSubmit={handleSubmitForm} className="flex flex-col gap-4 text-left">
+                    <div>
+                        <label className="text-xs font-bold text-navy block mb-1">Nama Lengkap Guru <span className="text-rose-500">*</span></label>
+                        <input
+                            required
+                            type="text"
+                            value={formData.name}
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-xs font-bold text-navy block mb-1">Email <span className="text-rose-500">*</span></label>
+                            <input
+                                required
+                                type="email"
+                                value={formData.email}
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-navy block mb-1">Jenjang Ajar <span className="text-rose-500">*</span></label>
+                            <select
+                                value={formData.jenjang}
+                                onChange={(e) => setFormData({ ...formData, jenjang: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50] cursor-pointer"
+                            >
+                                <option value="SD">Guru SD</option>
+                                <option value="SMP">Guru SMP</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold text-navy block mb-1">
+                            {editGuru ? 'Password Baru (Kosongkan jika tidak diubah)' : 'Kata Sandi Awal *'}
+                        </label>
+                        <input
+                            type="password"
+                            required={!editGuru}
+                            placeholder={editGuru ? '••••••••' : 'Minimal 6 karakter'}
+                            value={formData.password}
+                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={() => setIsFormOpen(false)}
+                            className="px-5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={formLoading}
+                            className="px-6 py-2.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white rounded-xl text-xs font-bold shadow-md cursor-pointer disabled:opacity-50"
+                        >
+                            {formLoading ? 'Menyimpan...' : 'Simpan Akun Guru'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* MODAL: CREATE TESTIMONIAL (Standardized) */}
+            <Modal
+                isOpen={isTestimonialModalOpen}
+                onClose={() => setIsTestimonialModalOpen(false)}
+                title="Tambah Testimoni Orang Tua"
+                size="md"
+            >
+                <form onSubmit={handleCreateTestimonial} className="flex flex-col gap-4 text-left">
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-xs font-bold text-navy block mb-1">Nama Orang Tua <span className="text-rose-500">*</span></label>
+                            <input
+                                required
+                                type="text"
+                                placeholder="Contoh: Ibu Rina Wulandari"
+                                value={testimonialFormData.parent_name}
+                                onChange={(e) => setTestimonialFormData({ ...testimonialFormData, parent_name: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-navy block mb-1">Orang Tua Dari / Peran</label>
+                            <input
+                                type="text"
+                                placeholder="Contoh: Orang Tua Alif (Kelas 5)"
+                                value={testimonialFormData.child_role}
+                                onChange={(e) => setTestimonialFormData({ ...testimonialFormData, child_role: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                        <div>
+                            <label className="text-xs font-bold text-navy block mb-1">Jenjang</label>
+                            <select
+                                value={testimonialFormData.jenjang}
+                                onChange={(e) => setTestimonialFormData({ ...testimonialFormData, jenjang: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                            >
+                                <option value="SD">SD</option>
+                                <option value="SMP">SMP</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-navy block mb-1">Rating</label>
+                            <select
+                                value={testimonialFormData.rating}
+                                onChange={(e) => setTestimonialFormData({ ...testimonialFormData, rating: parseInt(e.target.value) })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                            >
+                                <option value="5">⭐⭐⭐⭐⭐ (5 Bintang)</option>
+                                <option value="4">⭐⭐⭐⭐ (4 Bintang)</option>
+                                <option value="3">⭐⭐⭐ (3 Bintang)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-navy block mb-1">Status Awal</label>
+                            <select
+                                value={testimonialFormData.status}
+                                onChange={(e) => setTestimonialFormData({ ...testimonialFormData, status: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                            >
+                                <option value="approved">Langsung Terbit</option>
+                                <option value="pending">Menunggu Review</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold text-navy block mb-1">Isi Pesan Testimoni <span className="text-rose-500">*</span></label>
+                        <textarea
+                            required
+                            rows={3}
+                            placeholder="Ceritakan pengalaman belajar anak Anda di Stugether..."
+                            value={testimonialFormData.message}
+                            onChange={(e) => setTestimonialFormData({ ...testimonialFormData, message: e.target.value })}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50] resize-none"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold text-navy block mb-1">URL Avatar / Foto Orang Tua (Opsional)</label>
+                        <input
+                            type="url"
+                            placeholder="https://images.unsplash.com/..."
+                            value={testimonialFormData.avatar_url}
+                            onChange={(e) => setTestimonialFormData({ ...testimonialFormData, avatar_url: e.target.value })}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={() => setIsTestimonialModalOpen(false)}
+                            className="px-5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={testimonialFormLoading}
+                            className="px-6 py-2.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white rounded-xl text-xs font-bold shadow-md cursor-pointer disabled:opacity-50"
+                        >
+                            {testimonialFormLoading ? 'Menyimpan...' : 'Simpan Testimoni'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
 
             {/* CHAT MESSAGING DRAWER */}
             <ChatDrawer

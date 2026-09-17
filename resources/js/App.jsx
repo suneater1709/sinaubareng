@@ -11,7 +11,10 @@ import AdminPage from './components/AdminPage.jsx';
 import { api, getUser, setToken, setUser } from './utils/api';
 
 export default function App() {
-    const [currentScreen, setCurrentScreen] = useState('beranda'); // 'beranda' | 'jalur-belajar' | 'biaya' | 'kontak' | 'auth' | 'dashboard'
+    // Initialize current screen from history state if available
+    const [currentScreen, setCurrentScreen] = useState(() => {
+        return window.history.state?.screen || 'beranda';
+    });
     const [user, setCurrentUser] = useState(getUser());
     const [notification, setNotification] = useState(null);
 
@@ -21,10 +24,49 @@ export default function App() {
         setTimeout(() => setNotification(null), 4000);
     };
 
+    // Browser History popstate listener for natural back/forward navigation
+    useEffect(() => {
+        // Set initial state if not present
+        if (!window.history.state?.screen) {
+            window.history.replaceState({ screen: currentScreen }, '', window.location.pathname);
+        }
+
+        const handlePopState = (event) => {
+            if (event.state && event.state.screen) {
+                setCurrentScreen(event.state.screen);
+            } else {
+                setCurrentScreen('beranda');
+            }
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, []);
+
+    // Custom navigation handler with pushState
+    const navigate = (screen, options = { replace: false }) => {
+        const normalizedScreen = screen === 'landing' ? 'beranda' : screen;
+        setCurrentScreen(normalizedScreen);
+        if (options.replace) {
+            window.history.replaceState({ screen: normalizedScreen }, '', window.location.pathname);
+        } else {
+            window.history.pushState({ screen: normalizedScreen }, '', window.location.pathname);
+        }
+    };
+
+    // Natural Go Back handler
+    const goBack = () => {
+        if (window.history.length > 1) {
+            window.history.back();
+        } else {
+            navigate('beranda');
+        }
+    };
+
     useEffect(() => {
         const handleAuthFailed = () => {
             setCurrentUser(null);
-            setCurrentScreen('auth');
+            navigate('auth');
             showToast('Sesi masuk telah berakhir. Silakan masuk kembali.', 'error');
         };
 
@@ -62,7 +104,7 @@ export default function App() {
         setToken(token);
         setUser(userData);
         setCurrentUser(userData);
-        setCurrentScreen('dashboard');
+        navigate('dashboard');
         showToast(`Selamat datang kembali, ${userData.name}!`);
     };
 
@@ -75,7 +117,7 @@ export default function App() {
             setToken(null);
             setUser(null);
             setCurrentUser(null);
-            setCurrentScreen('beranda');
+            navigate('beranda');
             showToast('Anda berhasil keluar.');
         }
     };
@@ -88,23 +130,24 @@ export default function App() {
             case 'biaya':
             case 'kontak':
                 return (
-                    <PublicLayout currentRoute={currentScreen} onNavigate={setCurrentScreen}>
-                        {currentScreen === 'beranda' && <Beranda onNavigate={setCurrentScreen} />}
-                        {currentScreen === 'jalur-belajar' && <JalurBelajar onNavigate={setCurrentScreen} />}
-                        {currentScreen === 'biaya' && <Biaya onNavigate={setCurrentScreen} />}
-                        {currentScreen === 'kontak' && <KontakKami />}
+                    <PublicLayout currentRoute={currentScreen} onNavigate={navigate}>
+                        {currentScreen === 'beranda' && <Beranda onNavigate={navigate} onGoBack={goBack} />}
+                        {currentScreen === 'jalur-belajar' && <JalurBelajar onNavigate={navigate} onGoBack={goBack} />}
+                        {currentScreen === 'biaya' && <Biaya onNavigate={navigate} onGoBack={goBack} />}
+                        {currentScreen === 'kontak' && <KontakKami onNavigate={navigate} onGoBack={goBack} />}
                     </PublicLayout>
                 );
             case 'auth':
                 return (
                     <AuthPage 
                         onLogin={handleLogin} 
-                        onNavigate={setCurrentScreen} 
+                        onNavigate={navigate} 
+                        onGoBack={goBack}
                     />
                 );
             case 'dashboard':
                 if (!user) {
-                    setCurrentScreen('auth');
+                    navigate('auth');
                     return null;
                 }
                 
@@ -112,7 +155,9 @@ export default function App() {
                     return (
                         <AdminPage
                             user={user}
+                            onNavigate={navigate}
                             onLogout={handleLogout}
+                            showToast={showToast}
                         />
                     );
                 }
@@ -120,22 +165,22 @@ export default function App() {
                 return user.role === 'guru' ? (
                     <TeacherDashboard 
                         user={user} 
-                        onNavigate={setCurrentScreen} 
+                        onNavigate={navigate} 
                         onLogout={handleLogout} 
                         showToast={showToast}
                     />
                 ) : (
                     <StudentDashboard 
                         user={user} 
-                        onNavigate={setCurrentScreen} 
+                        onNavigate={navigate} 
                         onLogout={handleLogout} 
                         showToast={showToast}
                     />
                 );
             default:
                 return (
-                    <PublicLayout currentRoute="beranda" onNavigate={setCurrentScreen}>
-                        <Beranda onNavigate={setCurrentScreen} />
+                    <PublicLayout currentRoute="beranda" onNavigate={navigate}>
+                        <Beranda onNavigate={navigate} onGoBack={goBack} />
                     </PublicLayout>
                 );
         }

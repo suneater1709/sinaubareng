@@ -3,7 +3,7 @@ import { api } from '../utils/api';
 import { Shield, Eye, EyeOff, Loader, Lock, Mail, User } from 'lucide-react';
 import Logo from './Logo';
 
-export default function AuthPage({ onLogin, onNavigate }) {
+export default function AuthPage({ onLogin, onNavigate, onGoBack }) {
     const [isRegister, setIsRegister] = useState(false);
     const [role, setRole] = useState('siswa'); // 'siswa' | 'guru'
     const [name, setName] = useState('');
@@ -90,8 +90,17 @@ export default function AuthPage({ onLogin, onNavigate }) {
                     isRegister || role === 'siswa' ? 'bg-[#0f5c50]' : role === 'guru' ? 'bg-[#00c49a]' : 'bg-[#161938]'
                 }`}>
                     
-                    <div className="cursor-pointer z-10" onClick={() => onNavigate('landing')}>
-                        <Logo size="md" textColor="text-white" />
+                    <div className="flex items-center justify-between z-10">
+                        <div className="cursor-pointer" onClick={() => onGoBack ? onGoBack() : onNavigate('beranda')}>
+                            <Logo size="md" textColor="text-white" />
+                        </div>
+                        <button 
+                            type="button" 
+                            onClick={() => onGoBack ? onGoBack() : onNavigate('beranda')}
+                            className="text-xs font-semibold text-white/80 hover:text-white transition-colors flex items-center gap-1 cursor-pointer bg-white/10 px-3 py-1.5 rounded-full"
+                        >
+                            ← Kembali
+                        </button>
                     </div>
 
                     <div className="my-12 z-10">

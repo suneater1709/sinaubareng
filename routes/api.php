@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\QuizController;
 use App\Http\Controllers\Api\RankingController;
 use App\Http\Controllers\Api\StudentController;
 use App\Http\Controllers\Api\SubmissionController;
+use App\Http\Controllers\Api\TestimonialController;
 use Illuminate\Support\Facades\Route;
 
 // =========================================================
@@ -22,6 +23,9 @@ Route::post('/contact', [ContactController::class, 'submitContact']);
 Route::post('/schedule-visit', [ContactController::class, 'scheduleVisit']);
 Route::get('/public/stats', [AdminGuruController::class, 'publicStats']);
 Route::get('/public/settings', [AdminGuruController::class, 'settings']);
+Route::get('/public/testimonials', [TestimonialController::class, 'indexPublic']);
+Route::post('/testimonials', [TestimonialController::class, 'storePublic']);
+Route::get('/public/sessions', [AdminGuruController::class, 'sessions']);
 
 // =========================================================
 // TERPROTEKSI (butuh token Sanctum)
@@ -44,8 +48,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // ----- Leaderboard / Ranking Real-Time -----
     Route::get('/rankings', [RankingController::class, 'index']);
 
-    // ----- Sessions Schedule -----
+    // ----- Sessions Schedule (Guru, Siswa, Admin) -----
     Route::get('/sessions', [AdminGuruController::class, 'sessions']);
+    Route::post('/sessions', [AdminGuruController::class, 'storeSession']);
+    Route::put('/sessions/{id}', [AdminGuruController::class, 'updateSession']);
+    Route::delete('/sessions/{id}', [AdminGuruController::class, 'deleteSession']);
 
     // ----- Students (Guru & Admin) -----
     Route::get('/students', [StudentController::class, 'index']);
@@ -66,9 +73,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/sessions/{id}', [AdminGuruController::class, 'updateSession']);
         Route::delete('/sessions/{id}', [AdminGuruController::class, 'deleteSession']);
 
-        // Site settings
+        // Site settings & Photo uploads
         Route::get('/settings', [AdminGuruController::class, 'settings']);
         Route::post('/settings', [AdminGuruController::class, 'updateSettings']);
+        Route::post('/upload-image', [AdminGuruController::class, 'uploadImage']);
+
+        // Testimonials moderation
+        Route::get('/testimonials', [TestimonialController::class, 'indexAdmin']);
+        Route::post('/testimonials', [TestimonialController::class, 'storeAdmin']);
+        Route::patch('/testimonials/{id}/status', [TestimonialController::class, 'updateStatus']);
+        Route::delete('/testimonials/{id}', [TestimonialController::class, 'destroy']);
     });
 
     // ----- Materials -----

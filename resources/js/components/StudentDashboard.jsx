@@ -7,11 +7,11 @@ import {
     BookOpen, CheckSquare, Award, Clock, ArrowLeft, ArrowRight, Play, CheckCircle2, AlertCircle,
     User, LogOut, ChevronRight, Download, Eye, Music, Image as ImageIcon, ZoomIn, Info, Loader, Sparkles,
     Mail, Bell, Shield, Book, LayoutDashboard, Flame, Star, PlayCircle, Trophy, Search, SlidersHorizontal, Bookmark, LogIn,
-    GraduationCap, TrendingUp, FileQuestion
+    GraduationCap, TrendingUp, FileQuestion, Calendar, Video
 } from 'lucide-react';
 
 export default function StudentDashboard({ user = {}, onNavigate, onLogout, showToast }) {
-    const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'materials' | 'quizzes' | 'profile'
+    const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'sessions' | 'materials' | 'quizzes' | 'profile'
     const [quizSubTab, setQuizSubTab] = useState('aktif'); // 'aktif' | 'riwayat'
     
     // Notifications & Chat State
@@ -26,6 +26,7 @@ export default function StudentDashboard({ user = {}, onNavigate, onLogout, show
     const [materials, setMaterials] = useState([]);
     const [quizzes, setQuizzes] = useState([]);
     const [history, setHistory] = useState([]);
+    const [sessions, setSessions] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     
     // Reading materials progress states
@@ -132,6 +133,7 @@ export default function StudentDashboard({ user = {}, onNavigate, onLogout, show
         fetchQuizzes();
         fetchHistory();
         fetchRankings();
+        fetchSessions();
 
         // Polling rankings every 6 seconds for real-time leaderboard update
         const interval = setInterval(() => {
@@ -139,6 +141,15 @@ export default function StudentDashboard({ user = {}, onNavigate, onLogout, show
         }, 6000);
         return () => clearInterval(interval);
     }, []);
+
+    const fetchSessions = async () => {
+        try {
+            const data = await api.get('/sessions');
+            setSessions(Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []));
+        } catch (err) {
+            console.error('Failed to fetch sessions for student:', err);
+        }
+    };
 
     const fetchRankings = async (silent = false) => {
         if (!silent) setLoadingRankings(true);
@@ -358,6 +369,16 @@ export default function StudentDashboard({ user = {}, onNavigate, onLogout, show
                             }`}
                         >
                             <LayoutDashboard size={18} /> Ringkasan
+                        </button>
+                        <button
+                            onClick={() => { setActiveTab('sessions'); setActiveQuiz(null); setCelebrationResult(null); }}
+                            className={`w-full py-3.5 px-4 rounded-2xl text-sm font-semibold flex items-center gap-3 transition-colors cursor-pointer ${
+                                activeTab === 'sessions' 
+                                    ? 'bg-[#f0edff] text-primary' 
+                                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                            }`}
+                        >
+                            <Calendar size={18} /> Sesi Belajar Online
                         </button>
                         <button
                             onClick={() => { setActiveTab('materials'); setActiveQuiz(null); setCelebrationResult(null); }}
@@ -802,8 +823,103 @@ export default function StudentDashboard({ user = {}, onNavigate, onLogout, show
                     </div>
                 )}
 
-                        {/* TAB 2: Eksplorasi Materi (Materials) */}
-                        {activeTab === 'materials' && (
+                {/* TAB: JADWAL SESI BELAJAR ONLINE (Task #9) */}
+                {activeTab === 'sessions' && (
+                    <div className="flex flex-col gap-8 w-full max-w-5xl mx-auto">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div>
+                                <h2 className="text-3xl font-extrabold text-navy tracking-tight">Sesi Belajar Online (Tatap Muka)</h2>
+                                <p className="text-sm text-slate-600 mt-1">
+                                    Ikuti kelas tatap muka virtual interaktif bersama guru jenjang <span className="font-bold text-[#0f5c50]">{user.jenjang || 'SD'}</span>.
+                                </p>
+                            </div>
+                            <div className="px-4 py-2 bg-[#e6f4f1] text-[#0f5c50] text-xs font-bold rounded-full border border-[#a7f3d0] flex items-center gap-2">
+                                <Video size={16} /> Jenjang Siswa: {user.jenjang || 'SD'}
+                            </div>
+                        </div>
+
+                        {sessions.length === 0 ? (
+                            <div className="bg-white border border-slate-200/80 rounded-[32px] p-16 flex flex-col items-center justify-center text-center shadow-sm">
+                                <div className="w-16 h-16 rounded-full bg-[#f0edff] text-primary flex items-center justify-center mb-4">
+                                    <Calendar size={32} />
+                                </div>
+                                <h4 className="font-extrabold text-navy text-lg mb-1">Belum Ada Sesi Belajar</h4>
+                                <p className="text-sm text-slate-400 max-w-md">
+                                    Guru belum menjadwalkan sesi tatap muka online untuk jenjang Anda saat ini. Silakan periksa kembali berkala.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {sessions.map(session => (
+                                    <div key={session.id} className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                                        <div>
+                                            <div className="flex justify-between items-start gap-2 mb-3">
+                                                <span className={`px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                                                    session.status === 'ongoing' 
+                                                        ? 'bg-rose-100 text-rose-700 border border-rose-200 animate-pulse' 
+                                                        : session.status === 'completed'
+                                                        ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                                                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                }`}>
+                                                    {session.status === 'ongoing' ? '🔴 Sedang Berlangsung' : session.status === 'completed' ? '✓ Selesai' : '📅 Terjadwal'}
+                                                </span>
+                                                <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full text-[10px] font-bold">
+                                                    Kelas {session.jenjang || 'SD'}
+                                                </span>
+                                            </div>
+
+                                            <h4 className="font-extrabold text-navy text-lg mb-2">{session.judul}</h4>
+                                            <p className="text-xs text-slate-500 mb-4 line-clamp-2">{session.deskripsi || 'Sesi tatap muka virtual interaktif bersama guru mentor.'}</p>
+
+                                            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-600 flex flex-col gap-2 mb-4">
+                                                <div className="flex items-center gap-2">
+                                                    <Clock size={14} className="text-teal shrink-0" />
+                                                    <span className="font-medium">
+                                                        {new Date(session.waktu_mulai).toLocaleString('id-ID', {
+                                                            weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                                        })}
+                                                        {session.waktu_selesai && ` - ${new Date(session.waktu_selesai).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`}
+                                                    </span>
+                                                </div>
+                                                {session.guru && (
+                                                    <div className="flex items-center gap-2 pt-2 border-t border-slate-200/60">
+                                                        <div className="w-5 h-5 rounded-full bg-[#f0edff] text-primary text-[10px] font-bold flex items-center justify-center">
+                                                            {session.guru.name?.substring(0, 1)}
+                                                        </div>
+                                                        <span className="text-[11px] font-bold text-slate-700">Guru: {session.guru.name}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-4 border-t border-slate-100">
+                                            {session.link_meeting ? (
+                                                <a
+                                                    href={session.link_meeting}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="w-full py-3.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm shadow-teal/20"
+                                                >
+                                                    <Video size={16} /> Buka Link Meeting
+                                                </a>
+                                            ) : (
+                                                <button
+                                                    disabled
+                                                    className="w-full py-3 bg-slate-100 text-slate-400 text-xs font-bold rounded-xl flex items-center justify-center gap-2 cursor-not-allowed"
+                                                >
+                                                    Link Meeting Belum Tersedia
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* TAB 2: Eksplorasi Materi (Materials) */}
+                {activeTab === 'materials' && (
                             <div className="flex flex-col gap-8 w-full max-w-5xl mx-auto">
                                 {/* Search & Filters */}
                                 {materials.length > 0 && (

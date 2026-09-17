@@ -233,14 +233,32 @@ class AdminGuruController extends Controller
      */
     public function sessions(Request $request)
     {
-        $sessions = StudySession::with('guru')->orderBy('waktu_mulai', 'asc')->get();
+        $user = $request->user();
+        $query = StudySession::with('guru');
+
+        if ($user) {
+            if ($user->role === 'guru') {
+                $query->where(function ($q) use ($user) {
+                    $q->where('guru_id', $user->id)
+                      ->orWhere('jenjang', $user->jenjang ?? 'SD');
+                });
+            } elseif ($user->role === 'siswa') {
+                $query->where('jenjang', $user->jenjang ?? 'SD');
+            }
+        }
+
+        if ($request->has('jenjang') && !empty($request->jenjang)) {
+            $query->where('jenjang', $request->jenjang);
+        }
+
+        $sessions = $query->orderBy('waktu_mulai', 'asc')->get();
         return response()->json($sessions);
     }
 
     public function storeSession(Request $request)
     {
-        $data = $request->validate([
-            'guru_id'       => 'required|exists:users,id',
+        $user = $request->user();
+        $rules = [
             'jenjang'       => 'required|in:SD,SMP',
             'judul'         => 'required|string|max:191',
             'deskripsi'     => 'nullable|string',
@@ -248,10 +266,18 @@ class AdminGuruController extends Controller
             'waktu_selesai' => 'nullable|date|after_or_equal:waktu_mulai',
             'link_meeting'  => 'nullable|url|max:255',
             'status'        => 'nullable|in:scheduled,ongoing,completed,cancelled',
-        ]);
+        ];
+
+        if ($user->role === 'admin') {
+            $rules['guru_id'] = 'required|exists:users,id';
+        }
+
+        $data = $request->validate($rules);
+
+        $guruId = $user->role === 'guru' ? $user->id : $data['guru_id'];
 
         $session = StudySession::create([
-            'guru_id'       => $data['guru_id'],
+            'guru_id'       => $guruId,
             'jenjang'       => $data['jenjang'],
             'judul'         => $data['judul'],
             'deskripsi'     => $data['deskripsi'] ?? null,
@@ -269,7 +295,13 @@ class AdminGuruController extends Controller
 
     public function updateSession(Request $request, $id)
     {
+        $user = $request->user();
         $session = StudySession::findOrFail($id);
+
+        if ($user->role === 'guru' && $session->guru_id !== $user->id) {
+            abort(403, 'Anda tidak memiliki akses mengubah sesi ini.');
+        }
+
         $data = $request->validate([
             'guru_id'       => 'sometimes|required|exists:users,id',
             'jenjang'       => 'sometimes|required|in:SD,SMP',
@@ -289,12 +321,44 @@ class AdminGuruController extends Controller
         ]);
     }
 
-    public function deleteSession($id)
+    public function deleteSession(Request $request, $id)
     {
+        $user = $request->user();
         $session = StudySession::findOrFail($id);
+
+        if ($user->role === 'guru' && $session->guru_id !== $user->id) {
+            abort(403, 'Anda tidak memiliki akses menghapus sesi ini.');
+        }
+
         $session->delete();
 
         return response()->json(['message' => 'Sesi belajar berhasil dihapus.']);
+    }
+
+    /**
+     * Upload Image for Landing Page & Admin Use
+     */
+    public function uploadImage(Request $request)
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg,webp,svg,gif|max:5120',
+        ]);
+
+        if ($request->hasFile('image')) {
+            $file = $request->file('image');
+            $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+            $path = $file->storeAs('uploads/landing', $filename, 'public');
+
+            $url = asset('storage/' . $path);
+
+            return response()->json([
+                'message' => 'Foto berhasil diunggah.',
+                'url'     => $url,
+                'path'    => $path,
+            ], 201);
+        }
+
+        return response()->json(['message' => 'Tidak ada file yang diunggah.'], 400);
     }
 
     /**
@@ -309,10 +373,22 @@ class AdminGuruController extends Controller
     public function updateSettings(Request $request)
     {
         $data = $request->validate([
-            'hero_title'        => 'nullable|string',
-            'hero_subtitle'     => 'nullable|string',
-            'hero_image_url'    => 'nullable|string',
-            'active_students_badge' => 'nullable|string',
+            'hero_title'                  => 'nullable|string',
+            'hero_subtitle'               => 'nullable|string',
+            'hero_image_url'              => 'nullable|string',
+            'active_students_badge'       => 'nullable|string',
+            'active_students_count_type'  => 'nullable|in:auto,custom',
+            'active_students_count_custom'=> 'nullable|string',
+            'program_math_title'          => 'nullable|string',
+            'program_math_desc'           => 'nullable|string',
+            'program_math_image'          => 'nullable|string',
+            'program_math_badge'          => 'nullable|string',
+            'program_eng_title'           => 'nullable|string',
+            'program_eng_desc'            => 'nullable|string',
+            'program_eng_image'           => 'nullable|string',
+            'program_eng_badge'           => 'nullable|string',
+            'why_us_image_1'              => 'nullable|string',
+            'why_us_image_2'              => 'nullable|string',
         ]);
 
         foreach ($data as $key => $val) {
@@ -336,11 +412,21 @@ class AdminGuruController extends Controller
         $activeGurusCount = User::where('role', 'guru')->where('status', 'active')->count();
         $materialsCount = Material::count();
 
+        $countType = SiteSetting::get('active_students_count_type', 'auto');
+        $customCount = SiteSetting::get('active_students_count_custom');
+
+        if ($countType === 'custom' && !empty($customCount)) {
+            $displayCount = $customCount;
+        } else {
+            // Real count from DB
+            $displayCount = ($activeStudentsCount > 0 ? $activeStudentsCount : 0) . '+';
+        }
+
         return response()->json([
-            'active_students' => $activeStudentsCount,
-            'active_gurus'    => $activeGurusCount,
-            'total_materials' => $materialsCount,
-            'display_student_count' => ($activeStudentsCount > 0 ? (500 + $activeStudentsCount) : 500) . '+',
+            'active_students'       => $activeStudentsCount,
+            'active_gurus'          => $activeGurusCount,
+            'total_materials'       => $materialsCount,
+            'display_student_count' => $displayCount,
         ]);
     }
 }

@@ -1,8 +1,118 @@
-import React, { useState } from 'react';
-import { ArrowRight, CheckCircle, Globe, Sparkles, User, FileText, Target, BookOpen, GraduationCap, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+    ArrowRight, CheckCircle, Globe, Sparkles, User, FileText, Target, 
+    BookOpen, GraduationCap, X, Calendar, Clock, Video, CheckCircle2, AlertTriangle, Send 
+} from 'lucide-react';
+import Modal from '../common/Modal';
+import { api } from '../../utils/api';
 
 export default function JalurBelajar({ onNavigate }) {
     const [showCurriculumModal, setShowCurriculumModal] = useState(false);
+    
+    // Task #5: Speaking Skill Popup State
+    const [isSpeakingModalOpen, setIsSpeakingModalOpen] = useState(false);
+    const [speakingData, setSpeakingData] = useState({
+        nama: '',
+        whatsapp: '',
+        jenjang: 'SD',
+        tanggal: '',
+        catatan: ''
+    });
+    const [speakingStatus, setSpeakingStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
+    const [speakingError, setSpeakingError] = useState('');
+
+    // Task #6: Lihat Jadwal Kelas Popup State
+    const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+    const [sessionsList, setSessionsList] = useState([]);
+    const [loadingSessions, setLoadingSessions] = useState(false);
+
+    // Calculate minimum date for speaking session (tomorrow)
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const minDate = tomorrow.toISOString().split('T')[0];
+
+    // Fetch public sessions when Schedule modal opens
+    useEffect(() => {
+        if (isScheduleModalOpen) {
+            fetchPublicSessions();
+        }
+    }, [isScheduleModalOpen]);
+
+    const fetchPublicSessions = async () => {
+        setLoadingSessions(true);
+        try {
+            const data = await api.get('/public/sessions');
+            setSessionsList(data || []);
+        } catch (err) {
+            console.error('Failed to fetch public sessions:', err);
+        } finally {
+            setLoadingSessions(false);
+        }
+    };
+
+    const handleSpeakingSubmit = async (e) => {
+        e.preventDefault();
+        if (!speakingData.tanggal) {
+            setSpeakingError('Silakan pilih tanggal sesi percakapan.');
+            return;
+        }
+
+        setSpeakingStatus('loading');
+        setSpeakingError('');
+
+        const { nama, whatsapp, jenjang, tanggal, catatan } = speakingData;
+
+        // Clean WhatsApp number
+        let cleanWA = whatsapp.replace(/\D/g, '');
+        if (cleanWA.startsWith('0')) {
+            cleanWA = '62' + cleanWA.substring(1);
+        }
+
+        const formattedDate = new Intl.DateTimeFormat('id-ID', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        }).format(new Date(tanggal));
+
+        // Format WA message specifically for Speaking Skill
+        const waText = `Halo Sinau Bareng, saya ingin mendaftar Sesi Percakapan (Speaking Skill):\n` +
+            `• Nama Siswa/Orang Tua: ${nama}\n` +
+            `• No. WhatsApp: ${cleanWA || whatsapp}\n` +
+            `• Jenjang Siswa: ${jenjang}\n` +
+            `• Rencana Tanggal Sesi: ${formattedDate}\n` +
+            `• Topik / Catatan: ${catatan || 'Konsultasi Speaking Skill'}`;
+
+        const waUrl = `https://wa.me/6287752439572?text=${encodeURIComponent(waText)}`;
+
+        try {
+            await api.post('/schedule-visit', {
+                nama,
+                whatsapp: cleanWA || whatsapp,
+                jenjang,
+                tanggal,
+                catatan: `[Speaking Skill Consultation] ${catatan || '-'}`
+            });
+
+            window.open(waUrl, '_blank', 'noopener,noreferrer');
+
+            setSpeakingStatus('success');
+            setTimeout(() => {
+                setIsSpeakingModalOpen(false);
+                setSpeakingStatus('idle');
+                setSpeakingData({ nama: '', whatsapp: '', jenjang: 'SD', tanggal: '', catatan: '' });
+            }, 2500);
+        } catch (err) {
+            console.error('Speaking session submit error:', err);
+            window.open(waUrl, '_blank', 'noopener,noreferrer');
+            setSpeakingStatus('success');
+            setTimeout(() => {
+                setIsSpeakingModalOpen(false);
+                setSpeakingStatus('idle');
+            }, 2500);
+        }
+    };
+
     return (
         <div className="w-full">
             {/* Hero Section */}
@@ -20,13 +130,13 @@ export default function JalurBelajar({ onNavigate }) {
                     <div className="flex items-center gap-4 mt-4">
                         <button
                             onClick={() => onNavigate('auth')}
-                            className="px-8 py-4 bg-primary text-on-primary font-bold rounded-xl shadow-lg hover:bg-primary-container transition-all flex items-center gap-2"
+                            className="px-8 py-4 bg-primary text-on-primary font-bold rounded-xl shadow-lg hover:bg-primary-container transition-all flex items-center gap-2 cursor-pointer"
                         >
                             Mulai Belajar Sekarang <ArrowRight size={18} />
                         </button>
                         <button
                             onClick={() => onNavigate('kontak')}
-                            className="px-8 py-4 bg-white border border-outline-variant text-navy font-bold rounded-xl hover:bg-surface-container-low transition-all"
+                            className="px-8 py-4 bg-white border border-outline-variant text-navy font-bold rounded-xl hover:bg-surface-container-low transition-all cursor-pointer"
                         >
                             Konsultasi Gratis
                         </button>
@@ -110,20 +220,24 @@ export default function JalurBelajar({ onNavigate }) {
                         <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl"></div>
                     </div>
 
-                    {/* Speaking Skill Card */}
-                    <div className="md:col-span-4 bg-orange p-8 rounded-3xl text-white shadow-lg relative overflow-hidden">
+                    {/* Speaking Skill Card (Task #5: Replicates Visit Form into Speaking Skill Modal) */}
+                    <div className="md:col-span-4 bg-orange p-8 rounded-3xl text-white shadow-lg relative overflow-hidden flex flex-col justify-between">
                         <div className="relative z-10">
                             <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-white mb-6">
                                 <User size={24} />
                             </div>
                             <h3 className="text-xl font-bold mb-4">Speaking Skill</h3>
                             <p className="text-sm text-white/90 mb-8 leading-relaxed">
-                                Fokus pada keberanian berbicara dan pelafalan yang tepat (natural accent).
+                                Fokus pada keberanian berbicara dan pelafalan yang tepat (natural accent) bersama native speaker & mentor bersertifikat.
                             </p>
-                            <button className="w-full bg-white text-orange font-bold py-3 rounded-xl hover:bg-orange-50 transition-colors">
-                                Daftar Sesi Percakapan
-                            </button>
                         </div>
+                        <button 
+                            type="button"
+                            onClick={() => setIsSpeakingModalOpen(true)}
+                            className="w-full bg-white text-orange font-bold py-3.5 rounded-xl hover:bg-orange-50 transition-all cursor-pointer shadow-md hover:scale-[1.02] relative z-10"
+                        >
+                            Daftar Sesi Percakapan
+                        </button>
                     </div>
 
                     {/* AI Curriculum Info */}
@@ -193,7 +307,7 @@ export default function JalurBelajar({ onNavigate }) {
                 </div>
             </section>
 
-            {/* Banner CTA */}
+            {/* Banner CTA with "Lihat Jadwal Kelas" Popup */}
             <section className="w-full max-w-7xl mx-auto px-6 py-20">
                 <div className="bg-navy rounded-[40px] p-12 md:p-16 text-center relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-teal rounded-full blur-[100px] opacity-30"></div>
@@ -205,37 +319,223 @@ export default function JalurBelajar({ onNavigate }) {
                         Program intensif kami didesain khusus untuk melatih mental kompetisi dan penguasaan materi tingkat lanjut untuk sukses di ajang bergengsi.
                     </p>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
-                        <button onClick={() => onNavigate('auth')} className="w-full sm:w-auto px-8 py-4 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-primary-container transition-all flex items-center justify-center gap-2">
+                        <button onClick={() => onNavigate('auth')} className="w-full sm:w-auto px-8 py-4 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-primary-container transition-all flex items-center justify-center gap-2 cursor-pointer">
                             Daftar Program Intensif <ArrowRight size={18} />
                         </button>
-                        <button onClick={() => onNavigate('kontak')} className="w-full sm:w-auto px-8 py-4 bg-white/10 backdrop-blur-md border border-white/20 text-white font-bold rounded-xl hover:bg-white/20 transition-all">
+                        {/* Task #6: Opens "Lihat Jadwal Kelas" Modal */}
+                        <button 
+                            type="button"
+                            onClick={() => setIsScheduleModalOpen(true)} 
+                            className="w-full sm:w-auto px-8 py-4 bg-white/10 backdrop-blur-md border border-white/20 text-white font-bold rounded-xl hover:bg-white/20 transition-all cursor-pointer"
+                        >
                             Lihat Jadwal Kelas
                         </button>
                     </div>
                 </div>
             </section>
 
-            {/* Modal Kurikulum Iframe */}
-            {showCurriculumModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-                    <div className="absolute inset-0 bg-navy/80 backdrop-blur-sm" onClick={() => setShowCurriculumModal(false)}></div>
-                    <div className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
-                            <h3 className="font-bold text-navy text-lg">Detail Kurikulum Pendidikan</h3>
-                            <button onClick={() => setShowCurriculumModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition-colors cursor-pointer">
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div className="p-0 flex-1 overflow-hidden min-h-[60vh]">
-                            <iframe 
-                                src="/dummy-kurikulum.pdf" 
-                                className="w-full h-full min-h-[60vh] border-none" 
-                                title="Detail Kurikulum"
-                            />
+            {/* TASK #5: MODAL DAFTAR SESI PERCAKAPAN (SPEAKING SKILL) */}
+            <Modal
+                isOpen={isSpeakingModalOpen}
+                onClose={() => setIsSpeakingModalOpen(false)}
+                title="Daftar Sesi Percakapan"
+                subtitle="Jadwalkan sesi konsultasi dan speaking skill interaktif bersama mentor."
+                icon={<User size={22} />}
+                maxWidth="max-w-lg"
+            >
+                {speakingStatus === 'success' ? (
+                    <div className="bg-[#dcfce7] border border-[#bbf7d0] text-teal p-6 rounded-2xl flex items-center gap-3">
+                        <CheckCircle2 size={32} className="shrink-0 text-[#0f5c50]" />
+                        <div>
+                            <h4 className="font-bold text-sm">Pendaftaran Sesi Berhasil!</h4>
+                            <p className="text-xs mt-1 text-slate-600">Kami membuka percakapan WhatsApp untuk jadwal sesi speaking Anda.</p>
                         </div>
                     </div>
-                </div>
-            )}
+                ) : (
+                    <form onSubmit={handleSpeakingSubmit} className="flex flex-col gap-4 text-left">
+                        {speakingError && (
+                            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+                                <AlertTriangle size={16} className="shrink-0" />
+                                <span>{speakingError}</span>
+                            </div>
+                        )}
+
+                        <div>
+                            <label className="text-xs font-bold text-navy block mb-1.5">Nama Lengkap Siswa / Orang Tua <span className="text-rose-500">*</span></label>
+                            <input 
+                                type="text" 
+                                required 
+                                placeholder="Masukkan nama lengkap..."
+                                value={speakingData.nama}
+                                onChange={(e) => setSpeakingData({ ...speakingData, nama: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:border-[#0f5c50]"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="text-xs font-bold text-navy block mb-1.5">Nomor WhatsApp Aktif <span className="text-rose-500">*</span></label>
+                            <input 
+                                type="tel" 
+                                required 
+                                placeholder="Contoh: 087752439572"
+                                value={speakingData.whatsapp}
+                                onChange={(e) => setSpeakingData({ ...speakingData, whatsapp: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:border-[#0f5c50]"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs font-bold text-navy block mb-1.5">Jenjang Siswa <span className="text-rose-500">*</span></label>
+                                <select 
+                                    value={speakingData.jenjang}
+                                    onChange={(e) => setSpeakingData({ ...speakingData, jenjang: e.target.value })}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:border-[#0f5c50] cursor-pointer"
+                                >
+                                    <option value="SD">Jenjang SD</option>
+                                    <option value="SMP">Jenjang SMP</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-navy block mb-1.5">Rencana Tanggal Sesi <span className="text-rose-500">*</span></label>
+                                <input 
+                                    type="date" 
+                                    required 
+                                    min={minDate}
+                                    value={speakingData.tanggal}
+                                    onChange={(e) => setSpeakingData({ ...speakingData, tanggal: e.target.value })}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:border-[#0f5c50] cursor-pointer"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-xs font-bold text-navy block mb-1.5">Target / Catatan Khusus (Opsional)</label>
+                            <textarea 
+                                rows={3} 
+                                placeholder="Contoh: Ingin fokus pada percakapan sehari-hari atau persiapan presentasi sekolah..."
+                                value={speakingData.catatan}
+                                onChange={(e) => setSpeakingData({ ...speakingData, catatan: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 resize-none focus:outline-none focus:border-[#0f5c50]"
+                            ></textarea>
+                        </div>
+
+                        <div className="mt-2 flex gap-3">
+                            <button 
+                                type="button" 
+                                onClick={() => setIsSpeakingModalOpen(false)}
+                                className="w-1/3 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                            >
+                                Batal
+                            </button>
+                            <button 
+                                type="submit" 
+                                disabled={speakingStatus === 'loading'}
+                                className="w-2/3 py-3 bg-orange hover:bg-[#d97706] text-white font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
+                            >
+                                <Send size={15} /> {speakingStatus === 'loading' ? 'Mendaftarkan...' : 'Daftar Sekarang'}
+                            </button>
+                        </div>
+                    </form>
+                )}
+            </Modal>
+
+            {/* TASK #6: MODAL LIHAT JADWAL KELAS */}
+            <Modal
+                isOpen={isScheduleModalOpen}
+                onClose={() => setIsScheduleModalOpen(false)}
+                title="Jadwal Sesi Belajar & Kelas Terbuka"
+                subtitle="Informasi sesi kelas online dan pendalaman materi terbaru di Stugether."
+                icon={<Calendar size={22} />}
+                maxWidth="max-w-2xl"
+            >
+                {loadingSessions ? (
+                    <div className="p-8 text-center text-slate-400">
+                        <p className="text-xs">Memuat jadwal kelas terbaru...</p>
+                    </div>
+                ) : sessionsList.length === 0 ? (
+                    <div className="p-8 bg-slate-50 rounded-2xl border border-slate-100 text-center">
+                        <Calendar size={36} className="text-slate-300 mx-auto mb-2" />
+                        <p className="text-sm font-bold text-navy">Belum ada sesi kelas terbuka.</p>
+                        <p className="text-xs text-slate-500 mt-1">Sesi baru akan dijadwalkan secara berkala oleh pengajar kami.</p>
+                    </div>
+                ) : (
+                    <div className="flex flex-col gap-3.5 max-h-[60vh] overflow-y-auto no-scrollbar">
+                        {sessionsList.map((session) => (
+                            <div 
+                                key={session.id} 
+                                className="p-4 bg-white border border-slate-200/80 rounded-2xl hover:border-teal-300 transition-all shadow-sm flex flex-col sm:flex-row justify-between sm:items-center gap-4"
+                            >
+                                <div className="text-left">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                                            session.jenjang === 'SMP' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                        }`}>
+                                            Jenjang {session.jenjang}
+                                        </span>
+                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                            session.status === 'ongoing' ? 'bg-emerald-100 text-emerald-800' :
+                                            session.status === 'completed' ? 'bg-slate-100 text-slate-600' : 'bg-teal-50 text-teal-700'
+                                        }`}>
+                                            {session.status === 'ongoing' ? 'Sedang Berlangsung' : session.status === 'completed' ? 'Selesai' : 'Terjadwal'}
+                                        </span>
+                                    </div>
+                                    <h4 className="font-bold text-navy text-sm sm:text-base">{session.judul}</h4>
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        Pengajar: <span className="font-semibold text-slate-700">{session.guru?.name || 'Tutor Stugether'}</span>
+                                    </p>
+                                    <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-2">
+                                        <Clock size={12} className="text-teal" />
+                                        <span>
+                                            {new Intl.DateTimeFormat('id-ID', {
+                                                weekday: 'short',
+                                                day: 'numeric',
+                                                month: 'short',
+                                                year: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            }).format(new Date(session.waktu_mulai))}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {session.link_meeting && session.status !== 'completed' ? (
+                                    <a
+                                        href={session.link_meeting}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-4 py-2.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow transition-all shrink-0 cursor-pointer"
+                                    >
+                                        <Video size={14} /> Buka Meeting
+                                    </a>
+                                ) : (
+                                    <span className="text-xs text-slate-400 font-semibold px-3 py-1 bg-slate-50 rounded-lg shrink-0 text-center">
+                                        {session.status === 'completed' ? 'Sesi Berakhir' : 'Link via Akun'}
+                                    </span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </Modal>
+
+            {/* TASK #7: STANDARDIZED MODAL KURIKULUM IFRAME */}
+            <Modal
+                isOpen={showCurriculumModal}
+                onClose={() => setShowCurriculumModal(false)}
+                title="Detail Kurikulum Pendidikan"
+                subtitle="Panduan komprehensif silabus dan kurikulum akademik Stugether."
+                icon={<BookOpen size={22} />}
+                maxWidth="max-w-4xl"
+                bodyClassName="p-0 min-h-[60vh]"
+            >
+                <iframe 
+                    src="/dummy-kurikulum.pdf" 
+                    className="w-full h-full min-h-[60vh] border-none" 
+                    title="Detail Kurikulum"
+                />
+            </Modal>
         </div>
     );
 }

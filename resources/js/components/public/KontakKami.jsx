@@ -400,133 +400,118 @@ export default function KontakKami() {
                 </div>
             </section>
 
-            {/* MODAL JADWALKAN KUNJUNGAN */}
-            {isVisitModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60 backdrop-blur-sm animate-fade-in text-left">
-                    <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative border border-slate-100 max-h-[90vh] overflow-y-auto no-scrollbar">
-                        {/* Close button */}
-                        <button 
-                            onClick={() => setIsVisitModalOpen(false)}
-                            className="absolute top-6 right-6 p-2 rounded-full text-slate-400 hover:text-navy hover:bg-slate-100 transition-colors cursor-pointer"
-                        >
-                            <X size={20} />
-                        </button>
-
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-12 h-12 rounded-2xl bg-orange/15 text-orange flex items-center justify-center">
-                                <CalendarDays size={24} />
+            {/* STANDARDIZED MODAL JADWALKAN KUNJUNGAN (Task #7 Reusable Modal with Body Scroll Lock) */}
+            <Modal
+                isOpen={isVisitModalOpen}
+                onClose={() => setIsVisitModalOpen(false)}
+                title="Jadwalkan Kunjungan"
+                subtitle="Pilih tanggal dan isi detail kunjungan Anda ke pusat bimbingan kami."
+                icon={<CalendarDays size={22} />}
+                maxWidth="max-w-lg"
+            >
+                {visitStatus === 'success' ? (
+                    <div className="bg-[#dcfce7] border border-[#bbf7d0] text-[#0f5c50] p-6 rounded-2xl flex items-center gap-3">
+                        <CheckCircle2 size={32} className="shrink-0 text-[#0f5c50]" />
+                        <div>
+                            <h4 className="font-bold text-sm">Jadwal Berhasil Dikonfirmasi!</h4>
+                            <p className="text-xs mt-1 text-slate-600">Kami membuka percakapan WhatsApp untuk tindak lanjut kunjungan Anda.</p>
+                        </div>
+                    </div>
+                ) : (
+                    <form onSubmit={handleSubmitVisit} className="flex flex-col gap-4 text-left">
+                        {visitError && (
+                            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+                                <AlertTriangle size={16} className="shrink-0" />
+                                <span>{visitError}</span>
                             </div>
+                        )}
+
+                        <div>
+                            <label className="text-xs font-bold text-navy block mb-1.5">Nama Lengkap / Orang Tua <span className="text-rose-500">*</span></label>
+                            <input 
+                                type="text" 
+                                required 
+                                placeholder="Masukkan nama lengkap..."
+                                value={visitData.nama}
+                                onChange={(e) => setVisitData({ ...visitData, nama: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:border-[#0f5c50]"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="text-xs font-bold text-navy block mb-1.5">Nomor WhatsApp Aktif <span className="text-rose-500">*</span></label>
+                            <input 
+                                type="tel" 
+                                required 
+                                placeholder="Contoh: 087752439572"
+                                value={visitData.whatsapp}
+                                onChange={(e) => setVisitData({ ...visitData, whatsapp: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:border-[#0f5c50]"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <h3 className="text-xl font-bold text-navy">Jadwalkan Kunjungan</h3>
-                                <p className="text-xs text-on-surface-variant">Pilih tanggal dan isi detail kunjungan Anda</p>
+                                <label className="text-xs font-bold text-navy block mb-1.5">Jenjang <span className="text-rose-500">*</span></label>
+                                <select 
+                                    value={visitData.jenjang}
+                                    onChange={(e) => setVisitData({ ...visitData, jenjang: e.target.value })}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:border-[#0f5c50] cursor-pointer"
+                                >
+                                    <option value="SD">Paket SD</option>
+                                    <option value="SMP">Paket SMP</option>
+                                    <option value="Umum">Konsultasi Umum</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-navy block mb-1.5">Pilih Tanggal Kunjungan <span className="text-rose-500">*</span></label>
+                                <input 
+                                    type="date" 
+                                    required 
+                                    min={minDate}
+                                    value={visitData.tanggal}
+                                    onChange={handleDateChange}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:border-[#0f5c50] cursor-pointer"
+                                />
                             </div>
                         </div>
 
-                        {visitStatus === 'success' ? (
-                            <div className="bg-[#dcfce7] border border-[#bbf7d0] text-teal p-6 rounded-2xl flex items-center gap-3">
-                                <CheckCircle2 size={28} className="shrink-0" />
-                                <div>
-                                    <h4 className="font-bold text-sm">Jadwal Berhasil Dikonfirmasi!</h4>
-                                    <p className="text-xs mt-1">Kami membuka percakapan WhatsApp untuk tindak lanjut kunjungan Anda.</p>
-                                </div>
-                            </div>
-                        ) : (
-                            <form onSubmit={handleSubmitVisit} className="flex flex-col gap-4">
-                                {visitError && (
-                                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
-                                        <AlertTriangle size={16} className="shrink-0" />
-                                        <span>{visitError}</span>
-                                    </div>
-                                )}
+                        <div className="text-[11px] text-slate-500 flex items-center gap-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                            <Clock size={14} className="text-[#0f5c50] shrink-0" />
+                            <span>Jam Kunjungan: Senin-Jumat 08:00 - 17:00 | Sabtu 09:00 - 15:00 (Ahad Tutup)</span>
+                        </div>
 
-                                <div>
-                                    <label className="text-xs font-bold text-navy block mb-1.5">Nama Lengkap / Orang Tua <span className="text-rose-500">*</span></label>
-                                    <input 
-                                        type="text" 
-                                        required 
-                                        placeholder="Masukkan nama lengkap..."
-                                        value={visitData.nama}
-                                        onChange={(e) => setVisitData({ ...visitData, nama: e.target.value })}
-                                        className="w-full px-4 py-3 bg-surface-bright border border-outline-variant/50 rounded-xl text-sm focus:outline-none focus:border-primary"
-                                    />
-                                </div>
+                        <div>
+                            <label className="text-xs font-bold text-navy block mb-1.5">Catatan / Rencana Diskusi (Opsional)</label>
+                            <textarea 
+                                rows={3} 
+                                placeholder="Tuliskan jika ada kebutuhan khusus atau topik yang ingin dikonsultasikan..."
+                                value={visitData.catatan}
+                                onChange={(e) => setVisitData({ ...visitData, catatan: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 resize-none focus:outline-none focus:border-[#0f5c50]"
+                            ></textarea>
+                        </div>
 
-                                <div>
-                                    <label className="text-xs font-bold text-navy block mb-1.5">Nomor WhatsApp Aktif <span className="text-rose-500">*</span></label>
-                                    <input 
-                                        type="tel" 
-                                        required 
-                                        placeholder="Contoh: 087752439572"
-                                        value={visitData.whatsapp}
-                                        onChange={(e) => setVisitData({ ...visitData, whatsapp: e.target.value })}
-                                        className="w-full px-4 py-3 bg-surface-bright border border-outline-variant/50 rounded-xl text-sm focus:outline-none focus:border-primary"
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-xs font-bold text-navy block mb-1.5">Jenjang <span className="text-rose-500">*</span></label>
-                                        <select 
-                                            value={visitData.jenjang}
-                                            onChange={(e) => setVisitData({ ...visitData, jenjang: e.target.value })}
-                                            className="w-full px-4 py-3 bg-surface-bright border border-outline-variant/50 rounded-xl text-sm focus:outline-none focus:border-primary"
-                                        >
-                                            <option value="SD">Paket SD</option>
-                                            <option value="SMP">Paket SMP</option>
-                                            <option value="Umum">Konsultasi Umum</option>
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="text-xs font-bold text-navy block mb-1.5">Pilih Tanggal Kunjungan <span className="text-rose-500">*</span></label>
-                                        <input 
-                                            type="date" 
-                                            required 
-                                            min={minDate}
-                                            value={visitData.tanggal}
-                                            onChange={handleDateChange}
-                                            className="w-full px-4 py-3 bg-surface-bright border border-outline-variant/50 rounded-xl text-sm focus:outline-none focus:border-primary cursor-pointer"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="text-[11px] text-slate-500 flex items-center gap-1.5 bg-slate-50 p-2.5 rounded-xl">
-                                    <Clock size={14} className="text-teal shrink-0" />
-                                    <span>Jam Kunjungan: Senin-Jumat 08:00 - 17:00 | Sabtu 09:00 - 15:00 (Ahad Tutup)</span>
-                                </div>
-
-                                <div>
-                                    <label className="text-xs font-bold text-navy block mb-1.5">Catatan / Rencana Diskusi (Opsional)</label>
-                                    <textarea 
-                                        rows={3} 
-                                        placeholder="Tuliskan jika ada kebutuhan khusus atau topik yang ingin dikonsultasikan..."
-                                        value={visitData.catatan}
-                                        onChange={(e) => setVisitData({ ...visitData, catatan: e.target.value })}
-                                        className="w-full px-4 py-3 bg-surface-bright border border-outline-variant/50 rounded-xl text-sm resize-none focus:outline-none focus:border-primary"
-                                    ></textarea>
-                                </div>
-
-                                <div className="mt-4 flex gap-3">
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setIsVisitModalOpen(false)}
-                                        className="w-1/3 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
-                                    >
-                                        Batal
-                                    </button>
-                                    <button 
-                                        type="submit" 
-                                        disabled={visitStatus === 'loading'}
-                                        className="w-2/3 py-3.5 bg-primary hover:bg-primary-container text-white font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
-                                    >
-                                        <CalendarDays size={16} /> {visitStatus === 'loading' ? 'Mengonfirmasi...' : 'Konfirmasi Jadwal'}
-                                    </button>
-                                </div>
-                            </form>
-                        )}
-                    </div>
-                </div>
-            )}
+                        <div className="mt-2 flex gap-3">
+                            <button 
+                                type="button" 
+                                onClick={() => setIsVisitModalOpen(false)}
+                                className="w-1/3 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                            >
+                                Batal
+                            </button>
+                            <button 
+                                type="submit" 
+                                disabled={visitStatus === 'loading'}
+                                className="w-2/3 py-3 bg-orange hover:bg-[#d97706] text-white font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
+                            >
+                                <CalendarDays size={16} /> {visitStatus === 'loading' ? 'Mengonfirmasi...' : 'Konfirmasi Jadwal'}
+                            </button>
+                        </div>
+                    </form>
+                )}
+            </Modal>
         </div>
     );
 }
