@@ -9,7 +9,7 @@ import {
     BookOpen, FileText, Upload, Plus, Trash2, Edit3, Save, CheckSquare, 
     LogOut, Award, User, Clock, FileSpreadsheet, Eye, Music, Image as ImageIcon, Sparkles, Loader,
     Mail, Bell, GraduationCap, LayoutDashboard, FileQuestion, Headset, FolderX, ClipboardX, ArrowUpRight, 
-    Users, Settings, Calendar, BarChart3, Video, CheckCircle2, AlertCircle, ArrowLeft
+    Users, Settings, Calendar, BarChart3, Video, CheckCircle2, AlertCircle, ArrowLeft, Lock
 } from 'lucide-react';
 
 export default function TeacherDashboard({ user, onNavigate, onLogout, showToast }) {
@@ -1462,7 +1462,11 @@ export default function TeacherDashboard({ user, onNavigate, onLogout, showToast
                                         </div>
 
                                         <div className="pt-4 border-t border-slate-100 flex flex-col gap-3">
-                                            {session.link_meeting && (
+                                            {session.status === 'completed' ? (
+                                                <div className="w-full py-2.5 bg-slate-100 text-slate-400 text-xs font-bold rounded-xl flex items-center justify-center gap-2 select-none">
+                                                    <Lock size={15} /> Link Meeting Ditutup (Sesi Telah Selesai)
+                                                </div>
+                                            ) : session.link_meeting ? (
                                                 <a
                                                     href={session.link_meeting}
                                                     target="_blank"
@@ -1471,6 +1475,10 @@ export default function TeacherDashboard({ user, onNavigate, onLogout, showToast
                                                 >
                                                     <Video size={16} /> Buka Link Meeting
                                                 </a>
+                                            ) : (
+                                                <div className="w-full py-2.5 bg-slate-50 text-slate-400 text-xs font-medium rounded-xl flex items-center justify-center gap-2 select-none border border-slate-100">
+                                                    Link meeting belum ditambahkan
+                                                </div>
                                             )}
 
                                             <div className="flex items-center justify-between gap-2">
@@ -1486,18 +1494,15 @@ export default function TeacherDashboard({ user, onNavigate, onLogout, showToast
                                                     {session.status === 'ongoing' && (
                                                         <button
                                                             onClick={() => handleUpdateSessionStatus(session.id, 'completed')}
-                                                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
+                                                            className="px-3 py-1.5 bg-[#0f5c50] hover:bg-[#0c4a40] text-white text-[11px] font-bold rounded-lg transition-colors cursor-pointer shadow-sm"
                                                         >
                                                             Tandai Selesai
                                                         </button>
                                                     )}
                                                     {session.status === 'completed' && (
-                                                        <button
-                                                            onClick={() => handleUpdateSessionStatus(session.id, 'scheduled')}
-                                                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
-                                                        >
-                                                            Jadwalkan Ulang
-                                                        </button>
+                                                        <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 text-slate-500 rounded-lg text-[11px] font-bold select-none">
+                                                            <CheckCircle2 size={13} className="text-emerald-600" /> Sesi Selesai (Terkunci)
+                                                        </span>
                                                     )}
                                                 </div>
 

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AdminGuruController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ContactController;
+use App\Http\Controllers\Api\FaqController;
 use App\Http\Controllers\Api\MaterialController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\NotificationController;
@@ -26,6 +27,7 @@ Route::get('/public/settings', [AdminGuruController::class, 'settings']);
 Route::get('/public/testimonials', [TestimonialController::class, 'indexPublic']);
 Route::post('/testimonials', [TestimonialController::class, 'storePublic']);
 Route::get('/public/sessions', [AdminGuruController::class, 'sessions']);
+Route::get('/public/faqs', [FaqController::class, 'indexPublic']);
 
 // =========================================================
 // TERPROTEKSI (butuh token Sanctum)
@@ -83,6 +85,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/testimonials', [TestimonialController::class, 'storeAdmin']);
         Route::patch('/testimonials/{id}/status', [TestimonialController::class, 'updateStatus']);
         Route::delete('/testimonials/{id}', [TestimonialController::class, 'destroy']);
+
+        // FAQ management
+        Route::get('/faqs', [FaqController::class, 'indexAdmin']);
+        Route::post('/faqs', [FaqController::class, 'store']);
+        Route::put('/faqs/{id}', [FaqController::class, 'update']);
+        Route::delete('/faqs/{id}', [FaqController::class, 'destroy']);
     });
 
     // ----- Materials -----

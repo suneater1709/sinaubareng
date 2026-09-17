@@ -313,6 +313,10 @@ class AdminGuruController extends Controller
             'status'        => 'sometimes|required|in:scheduled,ongoing,completed,cancelled',
         ]);
 
+        if ($session->status === 'completed' && isset($data['status']) && $data['status'] !== 'completed') {
+            abort(422, 'Sesi belajar yang telah selesai tidak dapat diubah kembali menjadi terjadwal.');
+        }
+
         $session->update($data);
 
         return response()->json([

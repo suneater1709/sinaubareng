@@ -77,6 +77,99 @@
   animation: float-reverse 7s ease-in-out infinite;
 }
 
+/* Dynamic Shifting Gradient & Autonomous Color-Changing Backgrounds */
+@keyframes gradient-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes orb-drift-1 {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+    filter: hue-rotate(0deg);
+  }
+  33% {
+    transform: translate(60px, -40px) scale(1.15);
+    filter: hue-rotate(45deg);
+  }
+  66% {
+    transform: translate(-40px, 50px) scale(0.95);
+    filter: hue-rotate(90deg);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+    filter: hue-rotate(0deg);
+  }
+}
+
+@keyframes orb-drift-2 {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+    filter: hue-rotate(0deg);
+  }
+  33% {
+    transform: translate(-50px, 40px) scale(1.1);
+    filter: hue-rotate(-50deg);
+  }
+  66% {
+    transform: translate(40px, -60px) scale(0.9);
+    filter: hue-rotate(40deg);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+    filter: hue-rotate(0deg);
+  }
+}
+
+@keyframes orb-drift-3 {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    transform: translate(50px, 30px) scale(1.2);
+    filter: hue-rotate(80deg);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+    filter: hue-rotate(0deg);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.animate-gradient-mesh {
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfeff 25%, #fefce8 50%, #faf5ff 75%, #f0fdfa 100%);
+  background-size: 300% 300%;
+  animation: gradient-flow 12s ease infinite;
+}
+
+.animate-orb-1 {
+  animation: orb-drift-1 14s ease-in-out infinite, pulse-glow 8s ease-in-out infinite;
+}
+
+.animate-orb-2 {
+  animation: orb-drift-2 16s ease-in-out infinite, pulse-glow 10s ease-in-out infinite;
+}
+
+.animate-orb-3 {
+  animation: orb-drift-3 18s ease-in-out infinite, pulse-glow 12s ease-in-out infinite;
+}
+
 /* Hide scrollbars cross-browser while keeping scrolling functional */
 html, body, .scroll-container, .no-scrollbar {
   scrollbar-width: none;      /* Firefox */

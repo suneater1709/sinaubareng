@@ -6,11 +6,11 @@ import NotificationDropdown from './NotificationDropdown';
 import Modal from './common/Modal';
 import { 
     Users, UserPlus, LogOut, Check, X, Key, Search, Activity, BookOpen, Users2, Shield,
-    LayoutDashboard, Settings, Bell, Calendar, TrendingUp, UserCheck, UserX, SlidersHorizontal, Plus, Edit2, Ban, GraduationCap, Clock, MoreVertical, Eye, EyeOff, Info, User, Mail, Lock, Star, History, LogIn, ChevronRight, BarChart3, Video, Link, MessageSquare, CheckCircle2, AlertCircle, FileText, Globe, Upload, Image as ImageIcon, Trash2, CheckSquare, XCircle, ThumbsUp, ThumbsDown, Loader
+    LayoutDashboard, Settings, Bell, Calendar, TrendingUp, UserCheck, UserX, SlidersHorizontal, Plus, Edit2, Ban, GraduationCap, Clock, MoreVertical, Eye, EyeOff, Info, User, Mail, Lock, Star, History, LogIn, ChevronRight, BarChart3, Video, Link, MessageSquare, CheckCircle2, AlertCircle, FileText, Globe, Upload, Image as ImageIcon, Trash2, CheckSquare, XCircle, ThumbsUp, ThumbsDown, Loader, HelpCircle
 } from 'lucide-react';
 
 export default function AdminPage({ onLogout, user }) {
-    const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'guru' | 'laporan' | 'sesi' | 'testimonials' | 'pengaturan'
+    const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'guru' | 'laporan' | 'sesi' | 'testimonials' | 'faqs' | 'pengaturan'
     const [stats, setStats] = useState({ siswa_count: 0, guru_active_count: 0, guru_inactive_count: 0, sessions_scheduled_count: 0, sessions_completed_count: 0 });
     const [gurus, setGurus] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -51,6 +51,22 @@ export default function AdminPage({ onLogout, user }) {
         status: 'approved',
     });
     const [testimonialFormLoading, setTestimonialFormLoading] = useState(false);
+
+    // FAQ Management State
+    const [faqsList, setFaqsList] = useState([]);
+    const [loadingFaqs, setLoadingFaqs] = useState(false);
+    const [faqSearch, setFaqSearch] = useState('');
+    const [faqCategoryFilter, setFaqCategoryFilter] = useState('all');
+    const [isFaqModalOpen, setIsFaqModalOpen] = useState(false);
+    const [editFaq, setEditFaq] = useState(null);
+    const [faqFormData, setFaqFormData] = useState({
+        pertanyaan: '',
+        jawaban: '',
+        kategori: 'Umum',
+        urutan: 0,
+        is_active: true,
+    });
+    const [faqFormLoading, setFaqFormLoading] = useState(false);
 
     // Reports state
     const [reportsData, setReportsData] = useState(null);
@@ -93,10 +109,12 @@ export default function AdminPage({ onLogout, user }) {
             fetchGurus();
         } else if (activeTab === 'testimonials') {
             fetchTestimonials();
+        } else if (activeTab === 'faqs') {
+            fetchFaqs();
         } else if (activeTab === 'pengaturan') {
             fetchSettings();
         }
-    }, [activeTab, search, reportFilter]);
+    }, [activeTab, search, reportFilter, faqSearch, faqCategoryFilter]);
 
     const fetchStats = async () => {
         try {
@@ -200,6 +218,68 @@ export default function AdminPage({ onLogout, user }) {
             alert('Gagal membuat testimoni: ' + error.message);
         } finally {
             setTestimonialFormLoading(false);
+        }
+    };
+
+    const fetchFaqs = async () => {
+        setLoadingFaqs(true);
+        try {
+            const params = {};
+            if (faqSearch) params.search = faqSearch;
+            if (faqCategoryFilter !== 'all') params.kategori = faqCategoryFilter;
+            const data = await api.get('/admin/faqs', { params });
+            setFaqsList(Array.isArray(data) ? data : []);
+        } catch (error) {
+            console.error('Failed to fetch FAQs', error);
+        } finally {
+            setLoadingFaqs(false);
+        }
+    };
+
+    const handleSaveFaq = async (e) => {
+        e.preventDefault();
+        setFaqFormLoading(true);
+        try {
+            if (editFaq) {
+                await api.put(`/admin/faqs/${editFaq.id}`, faqFormData);
+            } else {
+                await api.post('/admin/faqs', faqFormData);
+            }
+            setIsFaqModalOpen(false);
+            setEditFaq(null);
+            setFaqFormData({
+                pertanyaan: '',
+                jawaban: '',
+                kategori: 'Umum',
+                urutan: 0,
+                is_active: true,
+            });
+            fetchFaqs();
+        } catch (error) {
+            alert('Gagal menyimpan FAQ: ' + error.message);
+        } finally {
+            setFaqFormLoading(false);
+        }
+    };
+
+    const handleDeleteFaq = async (id) => {
+        if (!window.confirm('Apakah Anda yakin ingin menghapus pertanyaan FAQ ini?')) return;
+        try {
+            await api.delete(`/admin/faqs/${id}`);
+            fetchFaqs();
+        } catch (error) {
+            alert('Gagal menghapus FAQ: ' + error.message);
+        }
+    };
+
+    const handleToggleFaqStatus = async (faq) => {
+        try {
+            await api.put(`/admin/faqs/${faq.id}`, {
+                is_active: !faq.is_active,
+            });
+            fetchFaqs();
+        } catch (error) {
+            alert('Gagal mengubah status FAQ: ' + error.message);
         }
     };
 
@@ -389,6 +469,17 @@ export default function AdminPage({ onLogout, user }) {
                             }`}
                         >
                             <MessageSquare size={18} /> Moderasi Testimoni
+                        </button>
+
+                        <button
+                            onClick={() => { setActiveTab('faqs'); setIsFormOpen(false); }}
+                            className={`w-full text-left px-4 py-3.5 rounded-2xl text-xs font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                                activeTab === 'faqs' 
+                                    ? 'bg-[#f0fbf9] text-[#0f5c50] shadow-sm' 
+                                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                            }`}
+                        >
+                            <HelpCircle size={18} /> Kelola FAQ
                         </button>
 
                         <button
@@ -1126,6 +1217,151 @@ export default function AdminPage({ onLogout, user }) {
                     )}
 
                     {/* TAB: PENGATURAN LANDING PAGE (Task #1 & #3: Manajemen Foto, Counter, Program Unggulan) */}
+                    {/* TAB: KELOLA FAQ */}
+                    {activeTab === 'faqs' && (
+                        <div className="max-w-6xl mx-auto flex flex-col gap-8 text-left">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div>
+                                    <h2 className="text-3xl font-extrabold text-navy tracking-tight mb-1">Kelola Pertanyaan Umum (FAQ)</h2>
+                                    <p className="text-slate-500 text-sm">Atur daftar tanya-jawab yang tampil di halaman Kontak Kami dan Pusat Bantuan publik.</p>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setEditFaq(null);
+                                        setFaqFormData({
+                                            pertanyaan: '',
+                                            jawaban: '',
+                                            kategori: 'Umum',
+                                            urutan: faqsList.length + 1,
+                                            is_active: true,
+                                        });
+                                        setIsFaqModalOpen(true);
+                                    }}
+                                    className="px-6 py-3.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white font-bold rounded-2xl text-xs transition-colors cursor-pointer shadow-md flex items-center gap-2 shrink-0"
+                                >
+                                    <Plus size={16} /> Tambah FAQ Baru
+                                </button>
+                            </div>
+
+                            {/* Search & Filter Bar */}
+                            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row gap-4 items-center justify-between">
+                                <div className="relative w-full sm:w-80">
+                                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                    <input
+                                        type="text"
+                                        placeholder="Cari pertanyaan atau jawaban..."
+                                        value={faqSearch}
+                                        onChange={(e) => setFaqSearch(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:border-[#0f5c50]"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+                                    {['all', 'Umum', 'Biaya & Paket', 'Layanan', 'Kurikulum & Adab', 'Beasiswa'].map(cat => (
+                                        <button
+                                            key={cat}
+                                            onClick={() => setFaqCategoryFilter(cat)}
+                                            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors cursor-pointer ${
+                                                faqCategoryFilter === cat 
+                                                    ? 'bg-[#0f5c50] text-white' 
+                                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                                            }`}
+                                        >
+                                            {cat === 'all' ? 'Semua Kategori' : cat}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* FAQ List Cards */}
+                            {loadingFaqs ? (
+                                <div className="p-12 text-center text-slate-400 bg-white rounded-3xl border border-slate-200 flex flex-col items-center gap-3">
+                                    <Loader className="animate-spin text-[#0f5c50]" size={28} />
+                                    <span>Memuat daftar FAQ...</span>
+                                </div>
+                            ) : faqsList.length === 0 ? (
+                                <div className="p-12 text-center text-slate-400 bg-white rounded-3xl border border-slate-200">
+                                    Belum ada FAQ yang sesuai dengan filter pencarian. Klik "Tambah FAQ Baru" untuk membuat.
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 gap-4">
+                                    {faqsList.map((faq, index) => (
+                                        <div 
+                                            key={faq.id} 
+                                            className={`p-6 rounded-3xl border transition-all ${
+                                                faq.is_active 
+                                                    ? 'bg-white border-slate-200/80 shadow-sm hover:shadow-md' 
+                                                    : 'bg-slate-50/80 border-slate-200 opacity-75'
+                                            }`}
+                                        >
+                                            <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                                        <span className="px-2.5 py-0.5 bg-slate-100 text-slate-600 rounded-full text-[10px] font-bold">
+                                                            Urutan #{faq.urutan || index + 1}
+                                                        </span>
+                                                        <span className="px-2.5 py-0.5 bg-teal/10 text-[#0f5c50] rounded-full text-[10px] font-bold">
+                                                            {faq.kategori || 'Umum'}
+                                                        </span>
+                                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                                            faq.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                                        }`}>
+                                                            {faq.is_active ? 'Aktif di Web' : 'Non-Aktif (Draft)'}
+                                                        </span>
+                                                    </div>
+
+                                                    <h4 className="font-extrabold text-navy text-base mb-2">
+                                                        {faq.pertanyaan}
+                                                    </h4>
+                                                    <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line bg-slate-50/70 p-4 rounded-2xl border border-slate-100">
+                                                        {faq.jawaban}
+                                                    </p>
+                                                </div>
+
+                                                <div className="flex items-center gap-2 shrink-0 self-end sm:self-start">
+                                                    <button
+                                                        onClick={() => handleToggleFaqStatus(faq)}
+                                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 ${
+                                                            faq.is_active 
+                                                                ? 'bg-amber-50 hover:bg-amber-100 text-amber-700' 
+                                                                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700'
+                                                        }`}
+                                                        title={faq.is_active ? 'Sembunyikan dari web' : 'Tampilkan di web'}
+                                                    >
+                                                        {faq.is_active ? 'Sembunyikan' : 'Aktifkan'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditFaq(faq);
+                                                            setFaqFormData({
+                                                                pertanyaan: faq.pertanyaan,
+                                                                jawaban: faq.jawaban,
+                                                                kategori: faq.kategori || 'Umum',
+                                                                urutan: faq.urutan || 0,
+                                                                is_active: faq.is_active,
+                                                            });
+                                                            setIsFaqModalOpen(true);
+                                                        }}
+                                                        className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors cursor-pointer"
+                                                        title="Edit FAQ"
+                                                    >
+                                                        <Edit2 size={15} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteFaq(faq.id)}
+                                                        className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition-colors cursor-pointer"
+                                                        title="Hapus FAQ"
+                                                    >
+                                                        <Trash2 size={15} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {activeTab === 'pengaturan' && (
                         <div className="max-w-4xl mx-auto flex flex-col gap-8 text-left">
                             <div>
@@ -1633,6 +1869,103 @@ export default function AdminPage({ onLogout, user }) {
                             className="px-6 py-2.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white rounded-xl text-xs font-bold shadow-md cursor-pointer disabled:opacity-50"
                         >
                             {testimonialFormLoading ? 'Menyimpan...' : 'Simpan Testimoni'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* MODAL: CREATE / EDIT FAQ (Standardized) */}
+            <Modal
+                isOpen={isFaqModalOpen}
+                onClose={() => {
+                    setIsFaqModalOpen(false);
+                    setEditFaq(null);
+                }}
+                title={editFaq ? "Edit Pertanyaan FAQ" : "Tambah Pertanyaan FAQ Baru"}
+                size="md"
+            >
+                <form onSubmit={handleSaveFaq} className="flex flex-col gap-4 text-left">
+                    <div>
+                        <label className="text-xs font-bold text-navy block mb-1">Pertanyaan <span className="text-rose-500">*</span></label>
+                        <input
+                            required
+                            type="text"
+                            placeholder="Contoh: Berapa biaya pendaftaran awal?"
+                            value={faqFormData.pertanyaan}
+                            onChange={(e) => setFaqFormData({ ...faqFormData, pertanyaan: e.target.value })}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold text-navy block mb-1">Jawaban Lengkap <span className="text-rose-500">*</span></label>
+                        <textarea
+                            required
+                            rows={4}
+                            placeholder="Tuliskan jawaban yang ramah, informatif, dan jelas bagi calon siswa / orang tua..."
+                            value={faqFormData.jawaban}
+                            onChange={(e) => setFaqFormData({ ...faqFormData, jawaban: e.target.value })}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50] resize-none"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-xs font-bold text-navy block mb-1">Kategori</label>
+                            <select
+                                value={faqFormData.kategori}
+                                onChange={(e) => setFaqFormData({ ...faqFormData, kategori: e.target.value })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50] cursor-pointer"
+                            >
+                                <option value="Umum">Umum</option>
+                                <option value="Biaya & Paket">Biaya & Paket</option>
+                                <option value="Layanan">Layanan</option>
+                                <option value="Kurikulum & Adab">Kurikulum & Adab</option>
+                                <option value="Beasiswa">Beasiswa</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-navy block mb-1">Nomor Urut Tampil</label>
+                            <input
+                                type="number"
+                                min={0}
+                                value={faqFormData.urutan}
+                                onChange={(e) => setFaqFormData({ ...faqFormData, urutan: parseInt(e.target.value) || 0 })}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 focus:border-[#0f5c50]"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2">
+                        <input
+                            type="checkbox"
+                            id="faq_is_active"
+                            checked={faqFormData.is_active}
+                            onChange={(e) => setFaqFormData({ ...faqFormData, is_active: e.target.checked })}
+                            className="w-4 h-4 text-[#0f5c50] rounded cursor-pointer accent-[#0f5c50]"
+                        />
+                        <label htmlFor="faq_is_active" className="text-xs font-bold text-slate-700 cursor-pointer">
+                            Tampilkan di Website Publik (Status Aktif)
+                        </label>
+                    </div>
+
+                    <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsFaqModalOpen(false);
+                                setEditFaq(null);
+                            }}
+                            className="px-5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={faqFormLoading}
+                            className="px-6 py-2.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white rounded-xl text-xs font-bold shadow-md cursor-pointer disabled:opacity-50"
+                        >
+                            {faqFormLoading ? 'Menyimpan...' : (editFaq ? 'Simpan Perubahan FAQ' : 'Tambah FAQ')}
                         </button>
                     </div>
                 </form>

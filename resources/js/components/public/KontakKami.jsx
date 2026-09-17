@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
+import Modal from '../common/Modal';
 import { 
     MessageCircle, Mail, MapPin, Send, ChevronDown, CalendarDays, 
-    CheckCircle2, Shield, X, Clock, AlertTriangle, ExternalLink, Sparkles 
+    CheckCircle2, Shield, X, Clock, AlertTriangle, ExternalLink, Sparkles, HelpCircle 
 } from 'lucide-react';
 
 export default function KontakKami() {
@@ -163,12 +164,59 @@ export default function KontakKami() {
         }
     };
 
-    const faqs = [
-        "Berapa biaya pendaftaran awal?",
-        "Apakah ada kelas percobaan gratis?",
-        "Bagaimana kurikulum syar'i diterapkan?",
-        "Apakah tersedia program beasiswa?"
-    ];
+    // FAQ Dynamic State
+    const [faqsList, setFaqsList] = useState([]);
+    const [openFaqIndex, setOpenFaqIndex] = useState(null);
+    const [loadingFaqs, setLoadingFaqs] = useState(false);
+
+    useEffect(() => {
+        const fetchFaqs = async () => {
+            setLoadingFaqs(true);
+            try {
+                const res = await api.get('/public/faqs');
+                if (Array.isArray(res) && res.length > 0) {
+                    setFaqsList(res);
+                } else {
+                    // Fallback defaults
+                    setFaqsList([
+                        {
+                            id: 1,
+                            pertanyaan: "Berapa biaya pendaftaran awal di Stugether?",
+                            jawaban: "Biaya pendaftaran awal sangat terjangkau dengan berbagai pilihan paket (Bulanan, Semester, atau Tahunan). Anda juga dapat mencoba sesi konsultasi dan asesmen kemampuan awal secara gratis.",
+                            kategori: "Biaya & Paket"
+                        },
+                        {
+                            id: 2,
+                            pertanyaan: "Apakah ada kelas percobaan (free trial) gratis?",
+                            jawaban: "Ya, kami menyediakan 1x sesi konsultasi dan trial class gratis untuk menguji kesesuaian metode belajar dengan karakter dan kebutuhan ananda.",
+                            kategori: "Layanan"
+                        },
+                        {
+                            id: 3,
+                            pertanyaan: "Bagaimana kurikulum syar'i & adab diterapkan?",
+                            jawaban: "Setiap sesi diawali dengan doa, pembiasaan adab belajar islami (adab terhadap ilmu & guru), serta materi penguatan akhlak mulia yang diintegrasikan secara natural dalam pelajaran sains dan bahasa.",
+                            kategori: "Kurikulum & Adab"
+                        },
+                        {
+                            id: 4,
+                            pertanyaan: "Apakah tersedia program beasiswa atau keringanan biaya?",
+                            jawaban: "Kami menyediakan program subsidi silang dan beasiswa bagi anak yatim dan siswa berprestasi yang membutuhkan bantuan finansial. Silakan hubungi tim admin kami melalui WhatsApp.",
+                            kategori: "Beasiswa"
+                        }
+                    ]);
+                }
+            } catch (err) {
+                console.error('Failed to load FAQs:', err);
+            } finally {
+                setLoadingFaqs(false);
+            }
+        };
+        fetchFaqs();
+    }, []);
+
+    const toggleFaq = (idx) => {
+        setOpenFaqIndex(openFaqIndex === idx ? null : idx);
+    };
 
     return (
         <div className="w-full">
@@ -363,18 +411,61 @@ export default function KontakKami() {
                 </div>
             </section>
 
-            {/* FAQ */}
+            {/* FAQ Accordion */}
             <section className="w-full max-w-4xl mx-auto px-6 py-12 text-center">
-                <h2 className="text-2xl font-bold text-navy mb-2">Pertanyaan Umum (FAQ)</h2>
-                <p className="text-sm text-on-surface-variant mb-8">Menjawab rasa penasaran Anda tentang Sinau Bareng</p>
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#dcfce7] rounded-full text-[#0f5c50] font-bold text-xs mb-3 border border-[#bbf7d0]">
+                    <HelpCircle size={14} /> FAQ & Pusat Informasi
+                </div>
+                <h2 className="text-3xl font-extrabold text-navy mb-2">Pertanyaan yang Sering Diajukan</h2>
+                <p className="text-sm text-slate-500 mb-8">Informasi lengkap seputar program bimbingan, kurikulum adab, dan teknis pendaftaran di Stugether.</p>
 
-                <div className="flex flex-col gap-4 text-left">
-                    {faqs.map((faq, idx) => (
-                        <div key={idx} className="bg-surface-container-low p-5 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-surface-container transition-colors">
-                            <span className="text-sm text-navy">{faq}</span>
-                            <ChevronDown size={16} className="text-on-surface-variant" />
-                        </div>
-                    ))}
+                <div className="flex flex-col gap-3.5 text-left">
+                    {faqsList.map((faq, idx) => {
+                        const isOpen = openFaqIndex === idx;
+                        return (
+                            <div 
+                                key={faq.id || idx} 
+                                className={`rounded-2xl border transition-all duration-300 overflow-hidden ${
+                                    isOpen 
+                                        ? 'bg-white border-[#0f5c50]/30 shadow-md ring-1 ring-[#0f5c50]/20' 
+                                        : 'bg-white border-slate-200/80 hover:border-slate-300 hover:shadow-sm'
+                                }`}
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => toggleFaq(idx)}
+                                    className="w-full p-5 flex items-center justify-between text-left gap-4 cursor-pointer focus:outline-none"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 transition-colors ${
+                                            isOpen ? 'bg-[#0f5c50] text-white' : 'bg-slate-100 text-slate-600'
+                                        }`}>
+                                            Q{idx + 1}
+                                        </div>
+                                        <span className="text-sm font-bold text-navy">
+                                            {faq.pertanyaan}
+                                        </span>
+                                    </div>
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shrink-0 ${
+                                        isOpen ? 'bg-[#dcfce7] text-[#0f5c50] rotate-180' : 'bg-slate-50 text-slate-400'
+                                    }`}>
+                                        <ChevronDown size={18} />
+                                    </div>
+                                </button>
+
+                                {isOpen && (
+                                    <div className="px-5 pb-5 pt-1 text-xs text-slate-600 leading-relaxed border-t border-slate-100 bg-slate-50/50">
+                                        <div className="flex items-start gap-2.5">
+                                            <div className="w-2 h-2 rounded-full bg-[#0f5c50] mt-1.5 shrink-0" />
+                                            <p className="whitespace-pre-line font-medium text-slate-600 text-xs">
+                                                {faq.jawaban}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             </section>
 

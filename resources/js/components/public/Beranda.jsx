@@ -120,24 +120,23 @@ export default function Beranda({ onNavigate }) {
     const engBadge = settings.program_eng_badge || "Interactive Class";
 
     return (
-        <div className="w-full text-slate-800 relative overflow-hidden bg-[#fafbfc]">
-            {/* Soft, Cheerful Animated Gradient & Parallax Background Orbs */}
+        <div className="w-full text-slate-800 relative overflow-hidden animate-gradient-mesh min-h-screen">
+            {/* Dynamic Autonomous Color-Changing Background Orbs */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden -z-10">
-                {/* Floating soft gradient orb 1 */}
+                {/* Floating soft gradient orb 1 (Emerald - Cyan - Mint with continuous hue morphing) */}
                 <div 
-                    className="absolute -top-32 -left-32 w-[600px] h-[600px] rounded-full bg-gradient-to-br from-emerald-100/60 via-teal-100/40 to-cyan-50/20 blur-3xl opacity-70 transition-transform duration-700 ease-out"
-                    style={{ transform: `translate3d(0, ${scrollY * 0.15}px, 0)` }}
+                    className="absolute -top-24 -left-24 w-[650px] h-[650px] rounded-full bg-gradient-to-br from-emerald-200/70 via-teal-200/50 to-cyan-100/40 blur-3xl opacity-80 animate-orb-1"
                 />
-                {/* Floating soft gradient orb 2 */}
+                {/* Floating soft gradient orb 2 (Amber - Peach - Sunset Orange) */}
                 <div 
-                    className="absolute top-[35%] -right-32 w-[550px] h-[550px] rounded-full bg-gradient-to-bl from-amber-100/50 via-orange-100/35 to-rose-50/20 blur-3xl opacity-60 transition-transform duration-700 ease-out"
-                    style={{ transform: `translate3d(0, ${-scrollY * 0.12}px, 0)` }}
+                    className="absolute top-[30%] -right-28 w-[600px] h-[600px] rounded-full bg-gradient-to-bl from-amber-200/65 via-orange-200/45 to-rose-100/35 blur-3xl opacity-75 animate-orb-2"
                 />
-                {/* Floating soft gradient orb 3 */}
+                {/* Floating soft gradient orb 3 (Purple - Indigo - Sky Blue) */}
                 <div 
-                    className="absolute top-[70%] left-[10%] w-[650px] h-[650px] rounded-full bg-gradient-to-tr from-purple-100/40 via-teal-100/30 to-emerald-50/20 blur-3xl opacity-60 transition-transform duration-700 ease-out"
-                    style={{ transform: `translate3d(0, ${scrollY * 0.08}px, 0)` }}
+                    className="absolute top-[65%] left-[8%] w-[700px] h-[700px] rounded-full bg-gradient-to-tr from-purple-200/50 via-teal-100/40 to-emerald-100/35 blur-3xl opacity-70 animate-orb-3"
                 />
+                {/* Subtle moving grid mesh pattern overlay */}
+                <div className="absolute inset-0 bg-[radial-gradient(#0f5c50_1px,transparent_1px)] [background-size:32px_32px] opacity-[0.035]"></div>
             </div>
 
             {/* Hero Section */}

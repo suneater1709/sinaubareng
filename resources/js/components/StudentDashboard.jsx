@@ -7,7 +7,7 @@ import {
     BookOpen, CheckSquare, Award, Clock, ArrowLeft, ArrowRight, Play, CheckCircle2, AlertCircle,
     User, LogOut, ChevronRight, Download, Eye, Music, Image as ImageIcon, ZoomIn, Info, Loader, Sparkles,
     Mail, Bell, Shield, Book, LayoutDashboard, Flame, Star, PlayCircle, Trophy, Search, SlidersHorizontal, Bookmark, LogIn,
-    GraduationCap, TrendingUp, FileQuestion, Calendar, Video
+    GraduationCap, TrendingUp, FileQuestion, Calendar, Video, Lock
 } from 'lucide-react';
 
 export default function StudentDashboard({ user = {}, onNavigate, onLogout, showToast }) {
@@ -893,23 +893,43 @@ export default function StudentDashboard({ user = {}, onNavigate, onLogout, show
                                         </div>
 
                                         <div className="pt-4 border-t border-slate-100">
-                                            {session.link_meeting ? (
-                                                <a
-                                                    href={session.link_meeting}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="w-full py-3.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm shadow-teal/20"
-                                                >
-                                                    <Video size={16} /> Buka Link Meeting
-                                                </a>
-                                            ) : (
-                                                <button
-                                                    disabled
-                                                    className="w-full py-3 bg-slate-100 text-slate-400 text-xs font-bold rounded-xl flex items-center justify-center gap-2 cursor-not-allowed"
-                                                >
-                                                    Link Meeting Belum Tersedia
-                                                </button>
-                                            )}
+                                            {(() => {
+                                                const isCompleted = session.status === 'completed';
+                                                const now = new Date();
+                                                const isTimeExpired = session.waktu_selesai 
+                                                    ? new Date(session.waktu_selesai) < now 
+                                                    : (new Date(session.waktu_mulai).getTime() + 2 * 60 * 60 * 1000) < now.getTime();
+
+                                                if (isCompleted || isTimeExpired) {
+                                                    return (
+                                                        <div className="w-full py-3.5 bg-slate-100 text-slate-400 text-xs font-bold rounded-xl flex items-center justify-center gap-2 select-none border border-slate-200/60">
+                                                            <Lock size={15} /> Sesi Belajar Telah Selesai (Akses Ditutup)
+                                                        </div>
+                                                    );
+                                                }
+
+                                                if (session.link_meeting) {
+                                                    return (
+                                                        <a
+                                                            href={session.link_meeting}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="w-full py-3.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm shadow-teal/20"
+                                                        >
+                                                            <Video size={16} /> Buka Link Meeting
+                                                        </a>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <button
+                                                        disabled
+                                                        className="w-full py-3 bg-slate-100 text-slate-400 text-xs font-bold rounded-xl flex items-center justify-center gap-2 cursor-not-allowed"
+                                                    >
+                                                        Link Meeting Belum Tersedia
+                                                    </button>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
                                 ))}
