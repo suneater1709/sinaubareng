@@ -714,7 +714,7 @@ export default function StudentDashboard({ user = {}, onNavigate, onLogout, show
                                 <div>
                                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Poin Ilmu</span>
                                     <span className="text-3xl font-extrabold text-[#b87c1a] block">
-                                        {history.reduce((acc, curr) => acc + (curr.skor_pg ?? 0), 0) + 1250}
+                                        {(rankingsData.current_user_rank?.points ?? (history.reduce((acc, curr) => acc + (curr.skor_pg ?? 0), 0) + (history.length * 50))).toLocaleString()}
                                     </span>
                                 </div>
                             </div>
@@ -1210,7 +1210,7 @@ export default function StudentDashboard({ user = {}, onNavigate, onLogout, show
                                                                 )}
                                                             </div>
                                                             <span className="text-[10px] text-slate-500 block font-medium">
-                                                                {student.points.toLocaleString()} Poin • {student.completed_quizzes || 0} Kuis
+                                                                {student.points.toLocaleString()} Poin • {student.quizzes_completed ?? student.completed_quizzes ?? 0} Kuis
                                                             </span>
                                                         </div>
                                                     </div>
