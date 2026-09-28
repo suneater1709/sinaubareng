@@ -30,8 +30,8 @@ class RankingController extends Controller
         $rankings = $students->map(function ($student) use ($currentUser) {
             $totalScore = $student->submissions->sum('skor_pg') ?? 0;
             $quizCount = $student->submissions->count();
-            // Calculate total gamified point
-            $points = (int) $totalScore + ($quizCount * 50) + 1200;
+            // Calculate total gamified real points (score sum + bonus per completed quiz)
+            $points = (int) $totalScore + ($quizCount * 50);
 
             return [
                 'id'                => $student->id,
@@ -40,6 +40,7 @@ class RankingController extends Controller
                 'jenjang'           => $student->jenjang ?? 'SD',
                 'points'            => $points,
                 'quizzes_completed' => $quizCount,
+                'completed_quizzes' => $quizCount,
                 'average_score'     => $quizCount > 0 ? round($totalScore / $quizCount) : 0,
                 'is_current_user'   => $currentUser && $currentUser->id === $student->id,
             ];

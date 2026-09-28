@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
     ArrowRight, CheckCircle, Globe, Sparkles, User, FileText, Target, 
-    BookOpen, GraduationCap, X, Calendar, Clock, Video, CheckCircle2, AlertTriangle, Send 
+    BookOpen, GraduationCap, X, Calendar, Clock, Video, CheckCircle2, AlertTriangle, Send,
+    ChevronLeft, ChevronRight, LayoutGrid, ListFilter, CalendarDays, Users, RotateCcw
 } from 'lucide-react';
 import Modal from '../common/Modal';
 import { api } from '../../utils/api';
@@ -21,10 +22,14 @@ export default function JalurBelajar({ onNavigate }) {
     const [speakingStatus, setSpeakingStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
     const [speakingError, setSpeakingError] = useState('');
 
-    // Task #6: Lihat Jadwal Kelas Popup State
+    // Task #6: Lihat Jadwal Kelas Popup State (Calendar Mode)
     const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
     const [sessionsList, setSessionsList] = useState([]);
     const [loadingSessions, setLoadingSessions] = useState(false);
+    const [calendarDate, setCalendarDate] = useState(new Date());
+    const [selectedCalendarDate, setSelectedCalendarDate] = useState(null);
+    const [scheduleJenjangFilter, setScheduleJenjangFilter] = useState('ALL'); // 'ALL' | 'SD' | 'SMP'
+    const [scheduleViewMode, setScheduleViewMode] = useState('calendar'); // 'calendar' | 'list'
 
     // Calculate minimum date for speaking session (tomorrow)
     const tomorrow = new Date();
@@ -42,7 +47,18 @@ export default function JalurBelajar({ onNavigate }) {
         setLoadingSessions(true);
         try {
             const data = await api.get('/public/sessions');
-            setSessionsList(data || []);
+            const list = data || [];
+            setSessionsList(list);
+            
+            // Align calendar view to first available session if any
+            if (list.length > 0) {
+                const upcoming = list.find(s => new Date(s.waktu_mulai) >= new Date()) || list[0];
+                if (upcoming?.waktu_mulai) {
+                    const sDate = new Date(upcoming.waktu_mulai);
+                    setCalendarDate(new Date(sDate.getFullYear(), sDate.getMonth(), 1));
+                    setSelectedCalendarDate(sDate);
+                }
+            }
         } catch (err) {
             console.error('Failed to fetch public sessions:', err);
         } finally {
@@ -441,81 +457,369 @@ export default function JalurBelajar({ onNavigate }) {
                 )}
             </Modal>
 
-            {/* TASK #6: MODAL LIHAT JADWAL KELAS */}
+            {/* TASK #6: MODAL LIHAT JADWAL KELAS (INTERACTIVE CALENDAR VIEW) */}
             <Modal
                 isOpen={isScheduleModalOpen}
                 onClose={() => setIsScheduleModalOpen(false)}
-                title="Jadwal Sesi Belajar & Kelas Terbuka"
-                subtitle="Informasi sesi kelas online dan pendalaman materi terbaru di Stugether."
-                icon={<Calendar size={22} />}
-                maxWidth="max-w-2xl"
+                title="Kalender Sesi Belajar & Kelas Terbuka"
+                subtitle="Jadwal interaktif tatap muka virtual dan pendalaman materi Stugether."
+                icon={<CalendarDays size={22} className="text-teal" />}
+                maxWidth="max-w-4xl"
             >
                 {loadingSessions ? (
-                    <div className="p-8 text-center text-slate-400">
-                        <p className="text-xs">Memuat jadwal kelas terbaru...</p>
+                    <div className="p-12 text-center text-slate-400">
+                        <div className="w-10 h-10 border-4 border-teal border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                        <p className="text-xs font-semibold">Memuat kalender jadwal kelas...</p>
                     </div>
                 ) : sessionsList.length === 0 ? (
-                    <div className="p-8 bg-slate-50 rounded-2xl border border-slate-100 text-center">
-                        <Calendar size={36} className="text-slate-300 mx-auto mb-2" />
-                        <p className="text-sm font-bold text-navy">Belum ada sesi kelas terbuka.</p>
-                        <p className="text-xs text-slate-500 mt-1">Sesi baru akan dijadwalkan secara berkala oleh pengajar kami.</p>
+                    <div className="p-10 bg-slate-50 rounded-3xl border border-slate-100 text-center">
+                        <Calendar size={42} className="text-slate-300 mx-auto mb-3" />
+                        <p className="text-base font-bold text-navy">Belum ada sesi kelas terbuka.</p>
+                        <p className="text-xs text-slate-500 mt-1">Sesi tatap muka baru akan dijadwalkan berkala oleh pengajar kami.</p>
                     </div>
                 ) : (
-                    <div className="flex flex-col gap-3.5 max-h-[60vh] overflow-y-auto no-scrollbar">
-                        {sessionsList.map((session) => (
-                            <div 
-                                key={session.id} 
-                                className="p-4 bg-white border border-slate-200/80 rounded-2xl hover:border-teal-300 transition-all shadow-sm flex flex-col sm:flex-row justify-between sm:items-center gap-4"
-                            >
-                                <div className="text-left">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
-                                            session.jenjang === 'SMP' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
-                                        }`}>
-                                            Jenjang {session.jenjang}
-                                        </span>
-                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                                            session.status === 'ongoing' ? 'bg-emerald-100 text-emerald-800' :
-                                            session.status === 'completed' ? 'bg-slate-100 text-slate-600' : 'bg-teal-50 text-teal-700'
-                                        }`}>
-                                            {session.status === 'ongoing' ? 'Sedang Berlangsung' : session.status === 'completed' ? 'Selesai' : 'Terjadwal'}
-                                        </span>
-                                    </div>
-                                    <h4 className="font-bold text-navy text-sm sm:text-base">{session.judul}</h4>
-                                    <p className="text-xs text-slate-500 mt-0.5">
-                                        Pengajar: <span className="font-semibold text-slate-700">{session.guru?.name || 'Tutor Stugether'}</span>
-                                    </p>
-                                    <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-2">
-                                        <Clock size={12} className="text-teal" />
-                                        <span>
-                                            {new Intl.DateTimeFormat('id-ID', {
-                                                weekday: 'short',
-                                                day: 'numeric',
-                                                month: 'short',
-                                                year: 'numeric',
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                            }).format(new Date(session.waktu_mulai))}
-                                        </span>
-                                    </div>
+                    <div className="space-y-6">
+                        {/* Top Controls: Month Navigation, Jenjang Filter & View Switcher */}
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50/80 p-4 rounded-2xl border border-slate-200/70">
+                            
+                            {/* Month & Year Navigator */}
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1 shadow-xs">
+                                    <button 
+                                        type="button"
+                                        onClick={() => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1))}
+                                        className="p-2 hover:bg-slate-100 rounded-lg text-slate-700 transition cursor-pointer"
+                                        title="Bulan Sebelumnya"
+                                    >
+                                        <ChevronLeft size={16} />
+                                    </button>
+                                    <span className="font-extrabold text-sm sm:text-base text-navy px-3 select-none min-w-[140px] text-center">
+                                        {new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(calendarDate)}
+                                    </span>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1))}
+                                        className="p-2 hover:bg-slate-100 rounded-lg text-slate-700 transition cursor-pointer"
+                                        title="Bulan Berikutnya"
+                                    >
+                                        <ChevronRight size={16} />
+                                    </button>
                                 </div>
 
-                                {session.link_meeting && session.status !== 'completed' ? (
-                                    <a
-                                        href={session.link_meeting}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="px-4 py-2.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow transition-all shrink-0 cursor-pointer"
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const today = new Date();
+                                        setCalendarDate(new Date(today.getFullYear(), today.getMonth(), 1));
+                                        setSelectedCalendarDate(today);
+                                    }}
+                                    className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1"
+                                >
+                                    <RotateCcw size={12} /> Hari Ini
+                                </button>
+                            </div>
+
+                            {/* Jenjang Filter & View Toggle */}
+                            <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex items-center bg-white border border-slate-200 p-1 rounded-xl text-xs font-bold shadow-xs">
+                                    {['ALL', 'SD', 'SMP'].map((j) => (
+                                        <button
+                                            key={j}
+                                            type="button"
+                                            onClick={() => setScheduleJenjangFilter(j)}
+                                            className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                                                scheduleJenjangFilter === j 
+                                                    ? 'bg-[#0f5c50] text-white shadow-xs' 
+                                                    : 'text-slate-600 hover:text-navy'
+                                            }`}
+                                        >
+                                            {j === 'ALL' ? 'Semua Jenjang' : `Jenjang ${j}`}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="flex items-center bg-white border border-slate-200 p-1 rounded-xl text-xs font-bold shadow-xs">
+                                    <button
+                                        type="button"
+                                        onClick={() => setScheduleViewMode('calendar')}
+                                        className={`p-1.5 rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                                            scheduleViewMode === 'calendar' ? 'bg-[#0f5c50] text-white' : 'text-slate-600 hover:text-navy'
+                                        }`}
+                                        title="Tampilan Kalender"
                                     >
-                                        <Video size={14} /> Buka Meeting
-                                    </a>
-                                ) : (
-                                    <span className="text-xs text-slate-400 font-semibold px-3 py-1 bg-slate-50 rounded-lg shrink-0 text-center">
-                                        {session.status === 'completed' ? 'Sesi Berakhir' : 'Link via Akun'}
-                                    </span>
+                                        <LayoutGrid size={15} />
+                                        <span className="hidden sm:inline">Kalender</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setScheduleViewMode('list')}
+                                        className={`p-1.5 rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                                            scheduleViewMode === 'list' ? 'bg-[#0f5c50] text-white' : 'text-slate-600 hover:text-navy'
+                                        }`}
+                                        title="Tampilan Daftar"
+                                    >
+                                        <ListFilter size={15} />
+                                        <span className="hidden sm:inline">Daftar</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* CALENDAR VIEW GRID */}
+                        {scheduleViewMode === 'calendar' && (
+                            <div className="bg-white rounded-3xl border border-slate-200/80 p-4 sm:p-6 shadow-sm overflow-hidden">
+                                {/* Day of week header */}
+                                <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2 text-center">
+                                    {['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'].map((dayName, idx) => (
+                                        <div 
+                                            key={dayName} 
+                                            className={`py-2 text-xs font-extrabold uppercase tracking-wider ${
+                                                idx === 0 ? 'text-rose-500' : idx === 6 ? 'text-teal-600' : 'text-slate-500'
+                                            }`}
+                                        >
+                                            {dayName}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Calendar days grid */}
+                                <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                                    {(() => {
+                                        const year = calendarDate.getFullYear();
+                                        const month = calendarDate.getMonth();
+                                        const daysInMonth = new Date(year, month + 1, 0).getDate();
+                                        const firstDayIndex = new Date(year, month, 1).getDay();
+                                        const prevMonthDays = new Date(year, month, 0).getDate();
+
+                                        const cells = [];
+
+                                        // Previous month offset days
+                                        for (let i = firstDayIndex - 1; i >= 0; i--) {
+                                            const dayNum = prevMonthDays - i;
+                                            cells.push(
+                                                <div 
+                                                    key={`prev-${dayNum}`}
+                                                    className="min-h-[64px] sm:min-h-[85px] p-1.5 sm:p-2 rounded-2xl bg-slate-50/50 border border-slate-100/50 text-slate-300 flex flex-col justify-between opacity-50 select-none"
+                                                >
+                                                    <span className="text-xs font-semibold">{dayNum}</span>
+                                                </div>
+                                            );
+                                        }
+
+                                        // Current month days
+                                        for (let day = 1; day <= daysInMonth; day++) {
+                                            const thisDate = new Date(year, month, day);
+                                            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                            
+                                            // Find sessions for this date
+                                            const daySessions = sessionsList.filter(s => {
+                                                if (!s.waktu_mulai) return false;
+                                                const sDate = new Date(s.waktu_mulai);
+                                                const sDateStr = `${sDate.getFullYear()}-${String(sDate.getMonth() + 1).padStart(2, '0')}-${String(sDate.getDate()).padStart(2, '0')}`;
+                                                const matchDate = sDateStr === dateStr;
+                                                const matchJenjang = scheduleJenjangFilter === 'ALL' || s.jenjang === scheduleJenjangFilter;
+                                                return matchDate && matchJenjang;
+                                            });
+
+                                            const isToday = new Date().toDateString() === thisDate.toDateString();
+                                            const isSelected = selectedCalendarDate && selectedCalendarDate.toDateString() === thisDate.toDateString();
+                                            const hasSessions = daySessions.length > 0;
+
+                                            cells.push(
+                                                <div 
+                                                    key={`current-${day}`}
+                                                    onClick={() => setSelectedCalendarDate(thisDate)}
+                                                    className={`min-h-[64px] sm:min-h-[85px] p-1.5 sm:p-2 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between relative text-left ${
+                                                        isSelected
+                                                            ? 'bg-emerald-50/80 border-[#0f5c50] ring-2 ring-[#0f5c50]/20 shadow-md'
+                                                            : hasSessions
+                                                            ? 'bg-amber-50/40 border-amber-200 hover:border-amber-400 hover:bg-amber-50 shadow-xs'
+                                                            : 'bg-white border-slate-100 hover:border-slate-300 hover:bg-slate-50/70'
+                                                    }`}
+                                                >
+                                                    <div className="flex justify-between items-start">
+                                                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-extrabold ${
+                                                            isSelected 
+                                                                ? 'bg-[#0f5c50] text-white' 
+                                                                : isToday 
+                                                                ? 'bg-teal-100 text-[#0f5c50] ring-1 ring-[#0f5c50]' 
+                                                                : 'text-slate-700'
+                                                        }`}>
+                                                            {day}
+                                                        </span>
+
+                                                        {isToday && (
+                                                            <span className="hidden sm:inline-block text-[9px] font-bold text-[#0f5c50] bg-emerald-100/70 px-1.5 py-0.2 rounded-full">
+                                                                Hari Ini
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Session badges on the date */}
+                                                    {hasSessions && (
+                                                        <div className="flex flex-col gap-1 mt-1">
+                                                            <div className="hidden sm:flex flex-wrap gap-1">
+                                                                {daySessions.slice(0, 2).map((sess) => (
+                                                                    <div 
+                                                                        key={sess.id}
+                                                                        className={`text-[9px] px-1.5 py-0.5 rounded font-bold truncate max-w-full ${
+                                                                            sess.jenjang === 'SMP' 
+                                                                                ? 'bg-indigo-100 text-indigo-800' 
+                                                                                : 'bg-amber-100 text-amber-800'
+                                                                        }`}
+                                                                        title={sess.judul}
+                                                                    >
+                                                                        {sess.judul}
+                                                                    </div>
+                                                                ))}
+                                                                {daySessions.length > 2 && (
+                                                                    <span className="text-[9px] text-slate-500 font-bold">
+                                                                        +{daySessions.length - 2} sesi
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {/* Mobile session indicator dot */}
+                                                            <div className="sm:hidden flex items-center justify-center gap-1 mt-1">
+                                                                <span className="w-2 h-2 rounded-full bg-[#0f5c50] animate-pulse"></span>
+                                                                <span className="text-[9px] font-extrabold text-[#0f5c50]">{daySessions.length}</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
+
+                                        // Next month padding days to complete 35 or 42 cells
+                                        const remainingCells = (7 - (cells.length % 7)) % 7;
+                                        for (let nextDay = 1; nextDay <= remainingCells; nextDay++) {
+                                            cells.push(
+                                                <div 
+                                                    key={`next-${nextDay}`}
+                                                    className="min-h-[64px] sm:min-h-[85px] p-1.5 sm:p-2 rounded-2xl bg-slate-50/50 border border-slate-100/50 text-slate-300 flex flex-col justify-between opacity-50 select-none"
+                                                >
+                                                    <span className="text-xs font-semibold">{nextDay}</span>
+                                                </div>
+                                            );
+                                        }
+
+                                        return cells;
+                                    })()}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* DETAIL SESI DI BAWAH KALENDER / DAFTAR SESI */}
+                        <div className="bg-slate-50/90 rounded-3xl p-5 sm:p-6 border border-slate-200 text-left">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4 pb-3 border-b border-slate-200">
+                                <div className="flex items-center gap-2">
+                                    <Clock size={16} className="text-[#0f5c50]" />
+                                    <h4 className="font-extrabold text-navy text-sm sm:text-base">
+                                        {selectedCalendarDate 
+                                            ? `Jadwal Sesi: ${new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(selectedCalendarDate)}`
+                                            : `Daftar Semua Sesi (${scheduleJenjangFilter === 'ALL' ? 'Semua Jenjang' : `Jenjang ${scheduleJenjangFilter}`})`
+                                        }
+                                    </h4>
+                                </div>
+
+                                {selectedCalendarDate && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedCalendarDate(null)}
+                                        className="text-xs font-bold text-[#0f5c50] hover:text-[#0c4a40] hover:underline cursor-pointer"
+                                    >
+                                        Lihat Semua Tanggal
+                                    </button>
                                 )}
                             </div>
-                        ))}
+
+                            {/* Session list items */}
+                            {(() => {
+                                const displayedSessions = sessionsList.filter(s => {
+                                    if (scheduleJenjangFilter !== 'ALL' && s.jenjang !== scheduleJenjangFilter) return false;
+                                    if (selectedCalendarDate) {
+                                        const sDate = new Date(s.waktu_mulai);
+                                        const dateStr = `${sDate.getFullYear()}-${String(sDate.getMonth() + 1).padStart(2, '0')}-${String(sDate.getDate()).padStart(2, '0')}`;
+                                        const selStr = `${selectedCalendarDate.getFullYear()}-${String(selectedCalendarDate.getMonth() + 1).padStart(2, '0')}-${String(selectedCalendarDate.getDate()).padStart(2, '0')}`;
+                                        return dateStr === selStr;
+                                    }
+                                    return true;
+                                });
+
+                                if (displayedSessions.length === 0) {
+                                    return (
+                                        <div className="py-8 text-center bg-white rounded-2xl border border-slate-100">
+                                            <Calendar size={32} className="text-slate-300 mx-auto mb-2" />
+                                            <p className="text-xs font-bold text-slate-700">Tidak ada jadwal sesi kelas pada tanggal ini.</p>
+                                            <p className="text-[11px] text-slate-400 mt-0.5">Silakan pilih tanggal lain yang bertanda sesi pada kalender di atas.</p>
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 max-h-[350px] overflow-y-auto no-scrollbar">
+                                        {displayedSessions.map((session) => (
+                                            <div 
+                                                key={session.id} 
+                                                className="p-4 bg-white border border-slate-200/80 rounded-2xl hover:border-teal-400 hover:shadow-md transition-all shadow-xs flex flex-col justify-between gap-3 text-left"
+                                            >
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-1.5">
+                                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                                                            session.jenjang === 'SMP' 
+                                                                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' 
+                                                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                        }`}>
+                                                            Jenjang {session.jenjang}
+                                                        </span>
+                                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                                            session.status === 'ongoing' ? 'bg-emerald-100 text-emerald-800' :
+                                                            session.status === 'completed' ? 'bg-slate-100 text-slate-600' : 'bg-teal-50 text-teal-700'
+                                                        }`}>
+                                                            {session.status === 'ongoing' ? '🔴 Sedang Berlangsung' : session.status === 'completed' ? '✓ Selesai' : '📅 Terjadwal'}
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    <h4 className="font-bold text-navy text-sm">{session.judul}</h4>
+                                                    <p className="text-xs text-slate-500 mt-0.5">
+                                                        Pengajar: <span className="font-semibold text-slate-700">{session.guru?.name || 'Tutor Stugether'}</span>
+                                                    </p>
+                                                </div>
+
+                                                <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                                                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
+                                                        <Clock size={13} className="text-[#0f5c50]" />
+                                                        <span>
+                                                            {new Intl.DateTimeFormat('id-ID', {
+                                                                weekday: 'short',
+                                                                day: 'numeric',
+                                                                month: 'short',
+                                                                hour: '2-digit',
+                                                                minute: '2-digit'
+                                                            }).format(new Date(session.waktu_mulai))}
+                                                        </span>
+                                                    </div>
+
+                                                    {session.link_meeting && session.status !== 'completed' ? (
+                                                        <a
+                                                            href={session.link_meeting}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="px-3 py-1.5 bg-[#0f5c50] hover:bg-[#0a423a] text-white font-bold rounded-xl text-xs flex items-center gap-1 shadow transition cursor-pointer shrink-0"
+                                                        >
+                                                            <Video size={13} /> Buka Meeting
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-[11px] text-slate-400 font-semibold px-2 py-1 bg-slate-100 rounded-lg shrink-0">
+                                                            {session.status === 'completed' ? 'Sesi Berakhir' : 'Link via Akun'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })()}
+                        </div>
                     </div>
                 )}
             </Modal>

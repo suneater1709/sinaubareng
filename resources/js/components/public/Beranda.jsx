@@ -28,6 +28,20 @@ export default function Beranda({ onNavigate }) {
     const [testiSuccess, setTestiSuccess] = useState(false);
     const [testiError, setTestiError] = useState('');
 
+    // 3D Parallax Mouse Tracking State
+    const [heroMouse, setHeroMouse] = useState({ x: 0, y: 0, isHovered: false });
+
+    const handleHeroMouseMove = (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = (e.clientX - rect.left) / rect.width - 0.5; // range: -0.5 to 0.5
+        const y = (e.clientY - rect.top) / rect.height - 0.5; // range: -0.5 to 0.5
+        setHeroMouse({ x, y, isHovered: true });
+    };
+
+    const handleHeroMouseLeave = () => {
+        setHeroMouse({ x: 0, y: 0, isHovered: false });
+    };
+
     // Fetch real stats, settings, and approved testimonials from database
     useEffect(() => {
         const fetchPublicData = async () => {
@@ -175,20 +189,59 @@ export default function Beranda({ onNavigate }) {
                     </div>
                 </div>
 
-                {/* Right Image/Visual with REAL Student Count Badge */}
-                <div className="relative flex justify-center lg:justify-end">
-                    <div className="w-full max-w-md bg-white border border-slate-200/80 rounded-3xl p-4 shadow-2xl relative z-10 transition-transform duration-500 hover:-translate-y-1">
+                {/* Right Image/Visual with REAL Student Count Badge & Smooth 3D Parallax */}
+                <div 
+                    className="relative flex justify-center lg:justify-end perspective-1000 py-6"
+                    onMouseMove={handleHeroMouseMove}
+                    onMouseLeave={handleHeroMouseLeave}
+                >
+                    <div 
+                        className="w-full max-w-md bg-white border border-slate-200/80 rounded-3xl p-4 shadow-2xl relative z-10 preserve-3d cursor-pointer"
+                        style={{
+                            transform: heroMouse.isHovered
+                                ? `perspective(1000px) rotateY(${heroMouse.x * 16}deg) rotateX(${-heroMouse.y * 16}deg) translateY(-6px) scale3d(1.02, 1.02, 1.02)`
+                                : `perspective(1000px) rotateY(0deg) rotateX(0deg) translateY(0px) scale3d(1, 1, 1)`,
+                            transition: heroMouse.isHovered 
+                                ? 'transform 0.15s cubic-bezier(0.2, 0, 0.2, 1), box-shadow 0.3s ease' 
+                                : 'transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.6s ease',
+                            boxShadow: heroMouse.isHovered
+                                ? '0 25px 50px -12px rgba(15, 92, 80, 0.25)'
+                                : '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+                        }}
+                    >
                         <div className="w-full h-[320px] bg-slate-100 rounded-2xl flex items-center justify-center mb-4 overflow-hidden relative">
                             <img 
                                 src={heroImage} 
                                 alt="Belajar Siswa Stugether" 
-                                className="w-full h-full object-cover transition-transform duration-700 hover:scale-105" 
+                                className="w-full h-full object-cover" 
+                                style={{
+                                    transform: heroMouse.isHovered
+                                        ? `scale(1.08) translate3d(${-heroMouse.x * 12}px, ${-heroMouse.y * 12}px, 0px)`
+                                        : `scale(1) translate3d(0px, 0px, 0px)`,
+                                    transition: 'transform 0.3s cubic-bezier(0.2, 0, 0.2, 1)'
+                                }}
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent"></div>
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none"></div>
+                            {/* Subtle Glass Glare */}
+                            <div 
+                                className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/20 to-white/0 pointer-events-none transition-opacity duration-300"
+                                style={{
+                                    opacity: heroMouse.isHovered ? 0.6 : 0,
+                                    transform: `translate3d(${heroMouse.x * 40}px, ${heroMouse.y * 40}px, 0px)`
+                                }}
+                            />
                         </div>
 
-                        {/* Real Database / Admin Count Badge (No animated loop) */}
-                        <div className="absolute -left-6 sm:-left-8 top-10 bg-white rounded-2xl p-4 shadow-xl border border-slate-150 flex items-center gap-3.5 z-20 transition-all hover:scale-105">
+                        {/* Real Database / Admin Count Badge (Parallax Layer 1) */}
+                        <div 
+                            className="absolute -left-6 sm:-left-8 top-10 bg-white rounded-2xl p-4 shadow-xl border border-slate-150 flex items-center gap-3.5 z-20"
+                            style={{
+                                transform: heroMouse.isHovered
+                                    ? `translate3d(${heroMouse.x * 22}px, ${heroMouse.y * 22}px, 40px) scale(1.05)`
+                                    : `translate3d(0px, 0px, 0px) scale(1)`,
+                                transition: heroMouse.isHovered ? 'transform 0.18s ease-out' : 'transform 0.6s ease-out'
+                            }}
+                        >
                             <div className="w-12 h-12 rounded-2xl bg-[#dcfce7] flex items-center justify-center text-[#0f5c50] shadow-inner shrink-0">
                                 <Users size={22} className="text-[#0f5c50]" />
                             </div>
@@ -200,8 +253,16 @@ export default function Beranda({ onNavigate }) {
                             </div>
                         </div>
 
-                        {/* Rating Sub-badge */}
-                        <div className="absolute -right-4 -bottom-4 bg-white rounded-2xl px-4 py-3 shadow-xl border border-slate-150 flex items-center gap-2.5 z-20">
+                        {/* Rating Sub-badge (Parallax Layer 2) */}
+                        <div 
+                            className="absolute -right-4 -bottom-4 bg-white rounded-2xl px-4 py-3 shadow-xl border border-slate-150 flex items-center gap-2.5 z-20"
+                            style={{
+                                transform: heroMouse.isHovered
+                                    ? `translate3d(${-heroMouse.x * 20}px, ${-heroMouse.y * 20}px, 50px) scale(1.05)`
+                                    : `translate3d(0px, 0px, 0px) scale(1)`,
+                                transition: heroMouse.isHovered ? 'transform 0.18s ease-out' : 'transform 0.6s ease-out'
+                            }}
+                        >
                             <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 font-bold">
                                 ★
                             </div>

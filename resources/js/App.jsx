@@ -208,8 +208,10 @@ export default function App() {
                 </div>
             )}
 
-            {/* Mount screen */}
-            {renderScreen()}
+            {/* Mount screen with smooth liquid pop-in transition */}
+            <div key={currentScreen} className="animate-page-pop w-full flex-1 flex flex-col">
+                {renderScreen()}
+            </div>
         </div>
     );
 }
