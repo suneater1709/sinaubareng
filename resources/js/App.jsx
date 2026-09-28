@@ -138,11 +138,13 @@ export default function App() {
                     </PublicLayout>
                 );
             case 'auth':
+            case 'register':
                 return (
                     <AuthPage 
                         onLogin={handleLogin} 
                         onNavigate={navigate} 
                         onGoBack={goBack}
+                        initialMode={currentScreen === 'register' ? 'register' : undefined}
                     />
                 );
             case 'dashboard':

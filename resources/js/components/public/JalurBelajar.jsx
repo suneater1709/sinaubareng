@@ -145,7 +145,10 @@ export default function JalurBelajar({ onNavigate }) {
                     </p>
                     <div className="flex items-center gap-4 mt-4">
                         <button
-                            onClick={() => onNavigate('auth')}
+                            onClick={() => {
+                                localStorage.setItem('authMode', 'register');
+                                onNavigate('register');
+                            }}
                             className="px-8 py-4 bg-primary text-on-primary font-bold rounded-xl shadow-lg hover:bg-primary-container transition-all flex items-center gap-2 cursor-pointer"
                         >
                             Mulai Belajar Sekarang <ArrowRight size={18} />
@@ -335,7 +338,15 @@ export default function JalurBelajar({ onNavigate }) {
                         Program intensif kami didesain khusus untuk melatih mental kompetisi dan penguasaan materi tingkat lanjut untuk sukses di ajang bergengsi.
                     </p>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
-                        <button onClick={() => onNavigate('auth')} className="w-full sm:w-auto px-8 py-4 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-primary-container transition-all flex items-center justify-center gap-2 cursor-pointer">
+                        <button 
+                            type="button"
+                            onClick={() => {
+                                localStorage.setItem('authMode', 'register');
+                                localStorage.setItem('selectedPackage', 'Program Intensif SD');
+                                onNavigate('register');
+                            }} 
+                            className="w-full sm:w-auto px-8 py-4 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-primary-container transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        >
                             Daftar Program Intensif <ArrowRight size={18} />
                         </button>
                         {/* Task #6: Opens "Lihat Jadwal Kelas" Modal */}

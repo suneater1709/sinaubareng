@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../utils/api';
 import Logo from './Logo';
 import ChatDrawer from './ChatDrawer';
@@ -1256,8 +1257,8 @@ export default function StudentDashboard({ user = {}, onNavigate, onLogout, show
                                 </div>
                             </div>
                         )}
-                {previewMaterial && (
-                    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                {previewMaterial && createPortal(
+                    <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setPreviewMaterial(null); }}>
                         <div className="bg-white border border-slate-200 rounded-[32px] w-full max-w-4xl overflow-hidden shadow-xl text-left flex flex-col max-h-[90vh]">
                             {/* Modal Header */}
                             <div className="p-6 border-b border-slate-150 flex justify-between items-center bg-slate-50/50">
@@ -1336,12 +1337,13 @@ export default function StudentDashboard({ user = {}, onNavigate, onLogout, show
                                 )}
                             </div>
                         </div>
-                    </div>
+                    </div>,
+                    document.body
                 )}
 
                 {/* MODAL: Zoom image */}
-                {zoomImage && (
-                    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setZoomImage(null)}>
+                {zoomImage && createPortal(
+                    <div className="fixed inset-0 z-[9999] bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setZoomImage(null)}>
                         <div className="relative max-w-3xl w-full max-h-[85vh] flex flex-col items-center gap-4">
                             <img src={zoomImage} alt="Attachment Zoomed" className="max-w-full max-h-[75vh] object-contain rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl" />
                             <button 
@@ -1351,7 +1353,8 @@ export default function StudentDashboard({ user = {}, onNavigate, onLogout, show
                                 Tutup
                             </button>
                         </div>
-                    </div>
+                    </div>,
+                    document.body
                 )}
 
                 {/* Floating Chat Drawer */}

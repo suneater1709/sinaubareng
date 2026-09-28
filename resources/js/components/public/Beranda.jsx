@@ -175,7 +175,10 @@ export default function Beranda({ onNavigate }) {
                     </p>
                     <div className="flex flex-wrap items-center gap-4 mt-2">
                         <button
-                            onClick={() => onNavigate('auth')}
+                            onClick={() => {
+                                localStorage.setItem('authMode', 'register');
+                                onNavigate('register');
+                            }}
                             className="px-8 py-4 bg-[#0f5c50] text-white font-bold rounded-2xl shadow-lg shadow-[#0f5c50]/20 hover:bg-[#0c4a40] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2 cursor-pointer"
                         >
                             Mulai Belajar Sekarang <ArrowRight size={18} />

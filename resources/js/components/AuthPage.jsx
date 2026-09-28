@@ -3,8 +3,12 @@ import { api } from '../utils/api';
 import { Shield, Eye, EyeOff, Loader, Lock, Mail, User } from 'lucide-react';
 import Logo from './Logo';
 
-export default function AuthPage({ onLogin, onNavigate, onGoBack }) {
-    const [isRegister, setIsRegister] = useState(false);
+export default function AuthPage({ onLogin, onNavigate, onGoBack, initialMode }) {
+    const [isRegister, setIsRegister] = useState(() => {
+        return initialMode === 'register' || 
+               localStorage.getItem('authMode') === 'register' || 
+               Boolean(localStorage.getItem('selectedPackage'));
+    });
     const [role, setRole] = useState('siswa'); // 'siswa' | 'guru'
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -12,7 +16,9 @@ export default function AuthPage({ onLogin, onNavigate, onGoBack }) {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState({});
-    const [selectedPackage, setSelectedPackage] = useState('');
+    const [selectedPackage, setSelectedPackage] = useState(() => {
+        return localStorage.getItem('selectedPackage') || 'Paket SD';
+    });
 
     React.useEffect(() => {
         const pkg = localStorage.getItem('selectedPackage');
@@ -27,7 +33,7 @@ export default function AuthPage({ onLogin, onNavigate, onGoBack }) {
             setIsRegister(true);
             localStorage.removeItem('authMode');
         }
-    }, []);
+    }, [initialMode]);
 
     const validate = () => {
         const newErrors = {};
@@ -241,6 +247,8 @@ export default function AuthPage({ onLogin, onNavigate, onGoBack }) {
                                     >
                                         <option value="Paket SD">Jenjang SD (Paket Belajar SD)</option>
                                         <option value="Paket SMP">Jenjang SMP (Paket Belajar SMP)</option>
+                                        <option value="Program Intensif SD">Program Intensif SD (Ujian & Olimpiade)</option>
+                                        <option value="Program Intensif SMP">Program Intensif SMP (Ujian & Olimpiade)</option>
                                     </select>
                                 </div>
                             </div>

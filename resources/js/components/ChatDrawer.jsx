@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../utils/api';
 import { MessageSquare, Send, X, User, Search, Check, CheckCheck, Loader, ChevronLeft, Shield } from 'lucide-react';
 
@@ -14,6 +15,25 @@ export default function ChatDrawer({ isOpen, onClose, currentUser, initialContac
     const [errorMsg, setErrorMsg] = useState('');
 
     const messagesEndRef = useRef(null);
+
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const originalOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            document.body.style.overflow = originalOverflow;
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isOpen, onClose]);
 
     // Fetch contacts
     const fetchContacts = async (silent = false) => {
@@ -110,8 +130,8 @@ export default function ChatDrawer({ isOpen, onClose, currentUser, initialContac
         c.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    return (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/50 backdrop-blur-sm flex justify-end transition-opacity duration-300">
+    return createPortal(
+        <div className="fixed inset-0 z-[9999] overflow-hidden bg-slate-900/50 backdrop-blur-sm flex justify-end transition-opacity duration-300" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
             <div className="w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col md:flex-row overflow-hidden border-l border-slate-200">
                 
                 {/* Contact List Sidebar */}
@@ -339,6 +359,7 @@ export default function ChatDrawer({ isOpen, onClose, currentUser, initialContac
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
