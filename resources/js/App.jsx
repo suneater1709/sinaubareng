@@ -9,6 +9,17 @@ import TeacherDashboard from './components/TeacherDashboard.jsx';
 import StudentDashboard from './components/StudentDashboard.jsx';
 import AdminPage from './components/AdminPage.jsx';
 import { api, getUser, setToken, setUser } from './utils/api';
+import { PageTransitionProvider, TransitionOverlay, usePageTransition } from './transition';
+
+// Container untuk menangkap referensi animasi scale & spring halaman baru
+function ScreenContainer({ children }) {
+    const { pageContainerRef } = usePageTransition();
+    return (
+        <div ref={pageContainerRef} className="w-full flex-1 flex flex-col will-change-[transform,opacity]">
+            {children}
+        </div>
+    );
+}
 
 export default function App() {
     // Initialize current screen from history state if available
@@ -189,31 +200,36 @@ export default function App() {
     };
 
     return (
-        <div className="min-h-screen bg-surface text-on-surface flex flex-col font-sans relative overflow-x-hidden antialiased">
-            {/* Notification Toast */}
-            {notification && (
-                <div 
-                    className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl border shadow-xl backdrop-blur-md transition-all duration-300 transform translate-y-0 ${
-                        notification.type === 'error' 
-                            ? 'bg-rose-50 border-rose-200 text-rose-800' 
-                            : 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                    }`}
-                >
-                    <span className="w-2 h-2 rounded-full animate-pulse bg-current" />
-                    <p className="text-xs font-bold">{notification.message}</p>
-                    <button 
-                        onClick={() => setNotification(null)}
-                        className="text-xs opacity-60 hover:opacity-100 transition-opacity ml-2"
-                    >
-                        ✕
-                    </button>
-                </div>
-            )}
+        <PageTransitionProvider currentRoute={currentScreen} onNavigate={navigate}>
+            {/* Veil overlay untuk animasi bubble clip-path */}
+            <TransitionOverlay />
 
-            {/* Mount screen with smooth liquid pop-in transition */}
-            <div key={currentScreen} className="animate-page-pop w-full flex-1 flex flex-col">
-                {renderScreen()}
+            <div className="min-h-screen bg-surface text-on-surface flex flex-col font-sans relative overflow-x-hidden antialiased">
+                {/* Notification Toast */}
+                {notification && (
+                    <div 
+                        className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl border shadow-xl backdrop-blur-md transition-all duration-300 transform translate-y-0 ${
+                            notification.type === 'error' 
+                                ? 'bg-rose-50 border-rose-200 text-rose-800' 
+                                : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                        }`}
+                    >
+                        <span className="w-2 h-2 rounded-full animate-pulse bg-current" />
+                        <p className="text-xs font-bold">{notification.message}</p>
+                        <button 
+                            onClick={() => setNotification(null)}
+                            className="text-xs opacity-60 hover:opacity-100 transition-opacity ml-2 cursor-pointer"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                )}
+
+                {/* Mount screen with page transition container */}
+                <ScreenContainer key={currentScreen}>
+                    {renderScreen()}
+                </ScreenContainer>
             </div>
-        </div>
+        </PageTransitionProvider>
     );
 }
