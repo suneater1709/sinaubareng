@@ -28,24 +28,24 @@ class TestimonialController extends Controller
     {
         $validated = $request->validate([
             'nama_orang_tua' => 'required|string|max:191',
-            'kelas_anak'     => 'required|string|max:191',
-            'rating'         => 'required|integer|min:1|max:5',
-            'pesan'          => 'required|string|max:1000',
-            'foto_url'       => 'nullable|string|max:255',
+            'kelas_anak' => 'required|string|max:191',
+            'rating' => 'required|integer|min:1|max:5',
+            'pesan' => 'required|string|max:1000',
+            'foto_url' => 'nullable|string|max:255',
         ]);
 
         $testimonial = Testimonial::create([
             'nama_orang_tua' => $validated['nama_orang_tua'],
-            'kelas_anak'     => $validated['kelas_anak'],
-            'rating'         => $validated['rating'],
-            'pesan'          => $validated['pesan'],
-            'foto_url'       => $validated['foto_url'] ?? null,
-            'status'         => 'pending',
+            'kelas_anak' => $validated['kelas_anak'],
+            'rating' => $validated['rating'],
+            'pesan' => $validated['pesan'],
+            'foto_url' => $validated['foto_url'] ?? null,
+            'status' => 'pending',
         ]);
 
         return response()->json([
             'message' => 'Terima kasih! Testimoni Anda telah kami terima dan akan tampil setelah diverifikasi oleh Admin.',
-            'data'    => $testimonial,
+            'data' => $testimonial,
         ], 201);
     }
 
@@ -79,7 +79,7 @@ class TestimonialController extends Controller
 
         return response()->json([
             'message' => 'Status testimoni berhasil diperbarui.',
-            'data'    => $testimonial,
+            'data' => $testimonial,
         ]);
     }
 
@@ -90,18 +90,18 @@ class TestimonialController extends Controller
     {
         $validated = $request->validate([
             'nama_orang_tua' => 'required|string|max:191',
-            'kelas_anak'     => 'required|string|max:191',
-            'rating'         => 'required|integer|min:1|max:5',
-            'pesan'          => 'required|string|max:1000',
-            'foto_url'       => 'nullable|string|max:255',
-            'status'         => 'required|in:pending,approved,rejected',
+            'kelas_anak' => 'required|string|max:191',
+            'rating' => 'required|integer|min:1|max:5',
+            'pesan' => 'required|string|max:1000',
+            'foto_url' => 'nullable|string|max:255',
+            'status' => 'required|in:pending,approved,rejected',
         ]);
 
         $testimonial = Testimonial::create($validated);
 
         return response()->json([
             'message' => 'Testimoni berhasil ditambahkan.',
-            'data'    => $testimonial,
+            'data' => $testimonial,
         ], 201);
     }
 

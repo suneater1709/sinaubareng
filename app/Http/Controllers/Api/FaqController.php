@@ -28,15 +28,15 @@ class FaqController extends Controller
     {
         $query = Faq::query();
 
-        if ($request->has('kategori') && !empty($request->kategori)) {
+        if ($request->has('kategori') && ! empty($request->kategori)) {
             $query->where('kategori', $request->kategori);
         }
 
-        if ($request->has('search') && !empty($request->search)) {
+        if ($request->has('search') && ! empty($request->search)) {
             $s = $request->search;
             $query->where(function ($q) use ($s) {
                 $q->where('pertanyaan', 'like', "%{$s}%")
-                  ->orWhere('jawaban', 'like', "%{$s}%");
+                    ->orWhere('jawaban', 'like', "%{$s}%");
             });
         }
 
@@ -54,23 +54,23 @@ class FaqController extends Controller
     {
         $validated = $request->validate([
             'pertanyaan' => 'required|string|max:255',
-            'jawaban'    => 'required|string',
-            'kategori'   => 'nullable|string|max:100',
-            'urutan'     => 'nullable|integer',
-            'is_active'  => 'nullable|boolean',
+            'jawaban' => 'required|string',
+            'kategori' => 'nullable|string|max:100',
+            'urutan' => 'nullable|integer',
+            'is_active' => 'nullable|boolean',
         ]);
 
         $faq = Faq::create([
             'pertanyaan' => $validated['pertanyaan'],
-            'jawaban'    => $validated['jawaban'],
-            'kategori'   => $validated['kategori'] ?? 'Umum',
-            'urutan'     => $validated['urutan'] ?? 0,
-            'is_active'  => $validated['is_active'] ?? true,
+            'jawaban' => $validated['jawaban'],
+            'kategori' => $validated['kategori'] ?? 'Umum',
+            'urutan' => $validated['urutan'] ?? 0,
+            'is_active' => $validated['is_active'] ?? true,
         ]);
 
         return response()->json([
             'message' => 'FAQ berhasil ditambahkan.',
-            'faq'     => $faq,
+            'faq' => $faq,
         ], 201);
     }
 
@@ -83,17 +83,17 @@ class FaqController extends Controller
 
         $validated = $request->validate([
             'pertanyaan' => 'sometimes|required|string|max:255',
-            'jawaban'    => 'sometimes|required|string',
-            'kategori'   => 'nullable|string|max:100',
-            'urutan'     => 'nullable|integer',
-            'is_active'  => 'nullable|boolean',
+            'jawaban' => 'sometimes|required|string',
+            'kategori' => 'nullable|string|max:100',
+            'urutan' => 'nullable|integer',
+            'is_active' => 'nullable|boolean',
         ]);
 
         $faq->update($validated);
 
         return response()->json([
             'message' => 'FAQ berhasil diperbarui.',
-            'faq'     => $faq,
+            'faq' => $faq,
         ]);
     }
 

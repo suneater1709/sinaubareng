@@ -3,8 +3,8 @@
 namespace App\Services;
 
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class ResilientUploadService
 {
@@ -35,10 +35,10 @@ class ResilientUploadService
 
             if ($path) {
                 return [
-                    'file_path'    => $path,
-                    'file_base64'  => null,
+                    'file_path' => $path,
+                    'file_base64' => null,
                     'storage_type' => 'storage',
-                    'mime_type'    => $mimeType,
+                    'mime_type' => $mimeType,
                 ];
             }
         } catch (\Throwable $e) {
@@ -48,13 +48,13 @@ class ResilientUploadService
         }
 
         // Jalur cadangan: convert ke base64 dan simpan langsung di DB
-        $base64 = 'data:' . $mimeType . ';base64,' . base64_encode(file_get_contents($file->getRealPath()));
+        $base64 = 'data:'.$mimeType.';base64,'.base64_encode(file_get_contents($file->getRealPath()));
 
         return [
-            'file_path'    => null,
-            'file_base64'  => $base64,
+            'file_path' => null,
+            'file_base64' => $base64,
             'storage_type' => 'base64',
-            'mime_type'    => $mimeType,
+            'mime_type' => $mimeType,
         ];
     }
 
@@ -79,6 +79,7 @@ class ResilientUploadService
             if ($path) {
                 Storage::disk($this->disk)->delete($path);
             }
+
             return null;
         }
 

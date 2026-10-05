@@ -11,14 +11,15 @@ class StudentController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = User::where('role', 'siswa');
+        $query = User::where('role', 'siswa')
+            ->select(['id', 'name', 'email', 'jenjang', 'status', 'created_at']);
 
         // Filter based on teacher's jenjang
         if ($user->role === 'guru') {
             if ($user->jenjang) {
                 $query->where('jenjang', $user->jenjang);
             }
-        } elseif ($request->has('jenjang') && !empty($request->input('jenjang'))) {
+        } elseif ($request->has('jenjang') && ! empty($request->input('jenjang'))) {
             $query->where('jenjang', $request->input('jenjang'));
         }
 
@@ -26,7 +27,7 @@ class StudentController extends Controller
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
 

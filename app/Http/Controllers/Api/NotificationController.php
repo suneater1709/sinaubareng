@@ -25,7 +25,7 @@ class NotificationController extends Controller
             ->count();
 
         return response()->json([
-            'unread_count'  => $unreadCount,
+            'unread_count' => $unreadCount,
             'notifications' => $notifications,
         ]);
     }

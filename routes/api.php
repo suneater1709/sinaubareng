@@ -68,7 +68,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/guru/{guru}', [AdminGuruController::class, 'update']);
         Route::patch('/guru/{guru}/status', [AdminGuruController::class, 'toggleStatus']);
         Route::post('/guru/{guru}/reset-password', [AdminGuruController::class, 'resetPassword']);
-        
+
         // Sessions management
         Route::get('/sessions', [AdminGuruController::class, 'sessions']);
         Route::post('/sessions', [AdminGuruController::class, 'storeSession']);

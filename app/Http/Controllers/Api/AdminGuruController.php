@@ -7,7 +7,6 @@ use App\Models\Material;
 use App\Models\Quiz;
 use App\Models\SiteSetting;
 use App\Models\StudySession;
-use App\Models\Submission;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -18,13 +17,14 @@ class AdminGuruController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::where('role', 'guru');
+        $query = User::where('role', 'guru')
+            ->select(['id', 'name', 'email', 'role', 'jenjang', 'status', 'created_at']);
 
         if ($request->has('search')) {
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
@@ -51,25 +51,25 @@ class AdminGuruController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'name'     => 'required|string|max:191',
-            'email'    => 'required|email|unique:users,email',
+            'name' => 'required|string|max:191',
+            'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
-            'jenjang'  => 'required|string|in:SD,SMP',
+            'jenjang' => 'required|string|in:SD,SMP',
         ]);
 
         $guru = User::create([
-            'name'       => $data['name'],
-            'email'      => $data['email'],
-            'password'   => Hash::make($data['password']),
-            'role'       => 'guru',
-            'jenjang'    => $data['jenjang'],
-            'status'     => 'active',
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => Hash::make($data['password']),
+            'role' => 'guru',
+            'jenjang' => $data['jenjang'],
+            'status' => 'active',
             'created_by' => $request->user()->id,
         ]);
 
         return response()->json([
             'message' => 'Akun guru berhasil dibuat.',
-            'guru'    => $guru,
+            'guru' => $guru,
         ], 201);
     }
 
@@ -80,15 +80,15 @@ class AdminGuruController extends Controller
         }
 
         $data = $request->validate([
-            'name'         => 'required|string|max:191',
-            'email'        => ['required', 'email', Rule::unique('users')->ignore($guru->id)],
-            'jenjang'      => 'sometimes|required|string|in:SD,SMP',
+            'name' => 'required|string|max:191',
+            'email' => ['required', 'email', Rule::unique('users')->ignore($guru->id)],
+            'jenjang' => 'sometimes|required|string|in:SD,SMP',
             'old_password' => 'nullable|string',
-            'password'     => 'nullable|string|min:6|required_with:old_password',
+            'password' => 'nullable|string|min:6|required_with:old_password',
         ]);
 
         $updateData = [
-            'name'  => $data['name'],
+            'name' => $data['name'],
             'email' => $data['email'],
         ];
 
@@ -96,10 +96,10 @@ class AdminGuruController extends Controller
             $updateData['jenjang'] = $data['jenjang'];
         }
 
-        if (!empty($data['password'])) {
-            if (empty($data['old_password']) || !Hash::check($data['old_password'], $guru->password)) {
+        if (! empty($data['password'])) {
+            if (empty($data['old_password']) || ! Hash::check($data['old_password'], $guru->password)) {
                 return response()->json([
-                    'message' => 'Password lama salah.'
+                    'message' => 'Password lama salah.',
                 ], 422);
             }
             $updateData['password'] = Hash::make($data['password']);
@@ -109,7 +109,7 @@ class AdminGuruController extends Controller
 
         return response()->json([
             'message' => 'Data guru berhasil diperbarui.',
-            'guru'    => $guru,
+            'guru' => $guru,
         ]);
     }
 
@@ -124,7 +124,7 @@ class AdminGuruController extends Controller
 
         return response()->json([
             'message' => 'Status guru berhasil diubah.',
-            'guru'    => $guru,
+            'guru' => $guru,
         ]);
     }
 
@@ -166,7 +166,7 @@ class AdminGuruController extends Controller
         $totalSiswaSMP = User::where('role', 'siswa')->where('status', 'active')->where('jenjang', 'SMP')->count();
 
         // 2. Sesi Belajar (Berjalan vs Terjadwal vs Selesai)
-        $sessionsQuery = StudySession::with('guru');
+        $sessionsQuery = StudySession::with('guru:id,name');
         if ($jenjangFilter) {
             $sessionsQuery->where('jenjang', $jenjangFilter);
         }
@@ -180,51 +180,55 @@ class AdminGuruController extends Controller
         $ongoingSessionsCount = $sessions->where('status', 'ongoing')->count();
 
         // 3. Progress Belajar Siswa
-        $studentsQuery = User::where('role', 'siswa')->where('status', 'active');
+        $studentsQuery = User::where('role', 'siswa')
+            ->where('status', 'active')
+            ->select(['id', 'name', 'email', 'jenjang', 'created_at']);
+
         if ($jenjangFilter) {
             $studentsQuery->where('jenjang', $jenjangFilter);
         }
 
         $students = $studentsQuery->with(['submissions' => function ($q) use ($startDate) {
-            $q->where('created_at', '>=', $startDate)->with('quiz');
+            $q->where('created_at', '>=', $startDate)->select(['id', 'siswa_id', 'skor_pg', 'created_at']);
         }])->get();
 
-        $totalMaterials = Material::count();
-
-        $studentProgressList = $students->map(function ($student) use ($totalMaterials) {
+        $studentProgressList = $students->map(function ($student) {
             $submissionCount = $student->submissions->count();
             $avgScore = $submissionCount > 0 ? round($student->submissions->avg('skor_pg')) : 0;
             $highestScore = $submissionCount > 0 ? $student->submissions->max('skor_pg') : 0;
 
             return [
-                'id'                 => $student->id,
-                'name'               => $student->name,
-                'email'              => $student->email,
-                'jenjang'            => $student->jenjang ?? 'SD',
-                'quizzes_completed'  => $submissionCount,
-                'average_score'      => $avgScore,
-                'highest_score'      => $highestScore,
-                'last_active'        => $student->submissions->max('created_at') ?? $student->created_at,
+                'id' => $student->id,
+                'name' => $student->name,
+                'email' => $student->email,
+                'jenjang' => $student->jenjang ?? 'SD',
+                'quizzes_completed' => $submissionCount,
+                'average_score' => $avgScore,
+                'highest_score' => $highestScore,
+                'last_active' => $student->submissions->max('created_at') ?? $student->created_at,
             ];
         });
 
         // 4. Ringkasan Aktivitas Guru
-        $gurus = User::where('role', 'guru')->withCount(['materials', 'quizzes'])->get();
+        $gurus = User::where('role', 'guru')
+            ->select(['id', 'name', 'email', 'jenjang', 'status', 'created_at'])
+            ->withCount(['materials', 'quizzes'])
+            ->get();
 
         return response()->json([
             'summary' => [
-                'total_siswa_sd'       => $totalSiswaSD,
-                'total_siswa_smp'      => $totalSiswaSMP,
-                'total_siswa_active'   => $totalSiswaSD + $totalSiswaSMP,
-                'sessions_scheduled'   => $scheduledSessionsCount,
-                'sessions_completed'   => $completedSessionsCount,
-                'sessions_ongoing'     => $ongoingSessionsCount,
-                'total_materials'      => $totalMaterials,
-                'total_quizzes'        => Quiz::count(),
+                'total_siswa_sd' => $totalSiswaSD,
+                'total_siswa_smp' => $totalSiswaSMP,
+                'total_siswa_active' => $totalSiswaSD + $totalSiswaSMP,
+                'sessions_scheduled' => $scheduledSessionsCount,
+                'sessions_completed' => $completedSessionsCount,
+                'sessions_ongoing' => $ongoingSessionsCount,
+                'total_materials' => Material::count(),
+                'total_quizzes' => Quiz::count(),
             ],
             'student_progress' => $studentProgressList,
-            'sessions'         => $sessions,
-            'gurus'            => $gurus,
+            'sessions' => $sessions,
+            'gurus' => $gurus,
         ]);
     }
 
@@ -240,18 +244,19 @@ class AdminGuruController extends Controller
             if ($user->role === 'guru') {
                 $query->where(function ($q) use ($user) {
                     $q->where('guru_id', $user->id)
-                      ->orWhere('jenjang', $user->jenjang ?? 'SD');
+                        ->orWhere('jenjang', $user->jenjang ?? 'SD');
                 });
             } elseif ($user->role === 'siswa') {
                 $query->where('jenjang', $user->jenjang ?? 'SD');
             }
         }
 
-        if ($request->has('jenjang') && !empty($request->jenjang)) {
+        if ($request->has('jenjang') && ! empty($request->jenjang)) {
             $query->where('jenjang', $request->jenjang);
         }
 
         $sessions = $query->orderBy('waktu_mulai', 'asc')->get();
+
         return response()->json($sessions);
     }
 
@@ -259,13 +264,13 @@ class AdminGuruController extends Controller
     {
         $user = $request->user();
         $rules = [
-            'jenjang'       => 'required|in:SD,SMP',
-            'judul'         => 'required|string|max:191',
-            'deskripsi'     => 'nullable|string',
-            'waktu_mulai'   => 'required|date',
+            'jenjang' => 'required|in:SD,SMP',
+            'judul' => 'required|string|max:191',
+            'deskripsi' => 'nullable|string',
+            'waktu_mulai' => 'required|date',
             'waktu_selesai' => 'nullable|date|after_or_equal:waktu_mulai',
-            'link_meeting'  => 'nullable|url|max:255',
-            'status'        => 'nullable|in:scheduled,ongoing,completed,cancelled',
+            'link_meeting' => 'nullable|url|max:255',
+            'status' => 'nullable|in:scheduled,ongoing,completed,cancelled',
         ];
 
         if ($user->role === 'admin') {
@@ -277,14 +282,14 @@ class AdminGuruController extends Controller
         $guruId = $user->role === 'guru' ? $user->id : $data['guru_id'];
 
         $session = StudySession::create([
-            'guru_id'       => $guruId,
-            'jenjang'       => $data['jenjang'],
-            'judul'         => $data['judul'],
-            'deskripsi'     => $data['deskripsi'] ?? null,
-            'waktu_mulai'   => $data['waktu_mulai'],
+            'guru_id' => $guruId,
+            'jenjang' => $data['jenjang'],
+            'judul' => $data['judul'],
+            'deskripsi' => $data['deskripsi'] ?? null,
+            'waktu_mulai' => $data['waktu_mulai'],
             'waktu_selesai' => $data['waktu_selesai'] ?? null,
-            'link_meeting'  => $data['link_meeting'] ?? null,
-            'status'        => $data['status'] ?? 'scheduled',
+            'link_meeting' => $data['link_meeting'] ?? null,
+            'status' => $data['status'] ?? 'scheduled',
         ]);
 
         return response()->json([
@@ -303,14 +308,14 @@ class AdminGuruController extends Controller
         }
 
         $data = $request->validate([
-            'guru_id'       => 'sometimes|required|exists:users,id',
-            'jenjang'       => 'sometimes|required|in:SD,SMP',
-            'judul'         => 'sometimes|required|string|max:191',
-            'deskripsi'     => 'nullable|string',
-            'waktu_mulai'   => 'sometimes|required|date',
+            'guru_id' => 'sometimes|required|exists:users,id',
+            'jenjang' => 'sometimes|required|in:SD,SMP',
+            'judul' => 'sometimes|required|string|max:191',
+            'deskripsi' => 'nullable|string',
+            'waktu_mulai' => 'sometimes|required|date',
             'waktu_selesai' => 'nullable|date',
-            'link_meeting'  => 'nullable|url|max:255',
-            'status'        => 'sometimes|required|in:scheduled,ongoing,completed,cancelled',
+            'link_meeting' => 'nullable|url|max:255',
+            'status' => 'sometimes|required|in:scheduled,ongoing,completed,cancelled',
         ]);
 
         if ($session->status === 'completed' && isset($data['status']) && $data['status'] !== 'completed') {
@@ -350,15 +355,15 @@ class AdminGuruController extends Controller
 
         if ($request->hasFile('image')) {
             $file = $request->file('image');
-            $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+            $filename = time().'_'.uniqid().'.'.$file->getClientOriginalExtension();
             $path = $file->storeAs('uploads/landing', $filename, 'public');
 
-            $url = asset('storage/' . $path);
+            $url = asset('storage/'.$path);
 
             return response()->json([
                 'message' => 'Foto berhasil diunggah.',
-                'url'     => $url,
-                'path'    => $path,
+                'url' => $url,
+                'path' => $path,
             ], 201);
         }
 
@@ -370,29 +375,30 @@ class AdminGuruController extends Controller
      */
     public function settings(Request $request)
     {
-        $settings = SiteSetting::all()->pluck('value', 'key');
+        $settings = SiteSetting::pluck('value', 'key');
+
         return response()->json($settings);
     }
 
     public function updateSettings(Request $request)
     {
         $data = $request->validate([
-            'hero_title'                  => 'nullable|string',
-            'hero_subtitle'               => 'nullable|string',
-            'hero_image_url'              => 'nullable|string',
-            'active_students_badge'       => 'nullable|string',
-            'active_students_count_type'  => 'nullable|in:auto,custom',
-            'active_students_count_custom'=> 'nullable|string',
-            'program_math_title'          => 'nullable|string',
-            'program_math_desc'           => 'nullable|string',
-            'program_math_image'          => 'nullable|string',
-            'program_math_badge'          => 'nullable|string',
-            'program_eng_title'           => 'nullable|string',
-            'program_eng_desc'            => 'nullable|string',
-            'program_eng_image'           => 'nullable|string',
-            'program_eng_badge'           => 'nullable|string',
-            'why_us_image_1'              => 'nullable|string',
-            'why_us_image_2'              => 'nullable|string',
+            'hero_title' => 'nullable|string',
+            'hero_subtitle' => 'nullable|string',
+            'hero_image_url' => 'nullable|string',
+            'active_students_badge' => 'nullable|string',
+            'active_students_count_type' => 'nullable|in:auto,custom',
+            'active_students_count_custom' => 'nullable|string',
+            'program_math_title' => 'nullable|string',
+            'program_math_desc' => 'nullable|string',
+            'program_math_image' => 'nullable|string',
+            'program_math_badge' => 'nullable|string',
+            'program_eng_title' => 'nullable|string',
+            'program_eng_desc' => 'nullable|string',
+            'program_eng_image' => 'nullable|string',
+            'program_eng_badge' => 'nullable|string',
+            'why_us_image_1' => 'nullable|string',
+            'why_us_image_2' => 'nullable|string',
         ]);
 
         foreach ($data as $key => $val) {
@@ -403,7 +409,7 @@ class AdminGuruController extends Controller
 
         return response()->json([
             'message' => 'Pengaturan halaman landing berhasil disimpan.',
-            'settings' => SiteSetting::all()->pluck('value', 'key'),
+            'settings' => SiteSetting::pluck('value', 'key'),
         ]);
     }
 
@@ -416,20 +422,21 @@ class AdminGuruController extends Controller
         $activeGurusCount = User::where('role', 'guru')->where('status', 'active')->count();
         $materialsCount = Material::count();
 
-        $countType = SiteSetting::get('active_students_count_type', 'auto');
-        $customCount = SiteSetting::get('active_students_count_custom');
+        $settings = SiteSetting::whereIn('key', ['active_students_count_type', 'active_students_count_custom'])->pluck('value', 'key');
+        $countType = $settings['active_students_count_type'] ?? 'auto';
+        $customCount = $settings['active_students_count_custom'] ?? null;
 
-        if ($countType === 'custom' && !empty($customCount)) {
+        if ($countType === 'custom' && ! empty($customCount)) {
             $displayCount = $customCount;
         } else {
             // Real count from DB
-            $displayCount = ($activeStudentsCount > 0 ? $activeStudentsCount : 0) . '+';
+            $displayCount = ($activeStudentsCount > 0 ? $activeStudentsCount : 0).'+';
         }
 
         return response()->json([
-            'active_students'       => $activeStudentsCount,
-            'active_gurus'          => $activeGurusCount,
-            'total_materials'       => $materialsCount,
+            'active_students' => $activeStudentsCount,
+            'active_gurus' => $activeGurusCount,
+            'total_materials' => $materialsCount,
             'display_student_count' => $displayCount,
         ]);
     }

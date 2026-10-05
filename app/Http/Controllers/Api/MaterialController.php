@@ -26,17 +26,17 @@ class MaterialController extends Controller
             if ($user->role === 'guru' && $user->jenjang) {
                 $query->where(function ($q) use ($user) {
                     $q->where('jenjang', $user->jenjang)
-                      ->orWhere('guru_id', $user->id);
+                        ->orWhere('guru_id', $user->id);
                 });
             } elseif ($user->role === 'siswa' && $user->jenjang) {
                 $query->where(function ($q) use ($user) {
                     $q->where('jenjang', $user->jenjang)
-                      ->orWhereNull('jenjang');
+                        ->orWhereNull('jenjang');
                 });
             }
         }
 
-        if ($request->has('jenjang') && !empty($request->input('jenjang'))) {
+        if ($request->has('jenjang') && ! empty($request->input('jenjang'))) {
             $query->where('jenjang', $request->input('jenjang'));
         }
 
@@ -48,18 +48,18 @@ class MaterialController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'judul'      => 'required|string|max:255',
-            'deskripsi'  => 'nullable|string',
-            'jenjang'    => 'nullable|string|in:SD,SMP',
+            'judul' => 'required|string|max:255',
+            'deskripsi' => 'nullable|string',
+            'jenjang' => 'nullable|string|in:SD,SMP',
             'attachment' => 'nullable', // allow file or base64 or URL
         ]);
 
         $jenjang = $data['jenjang'] ?? $request->user()->jenjang ?? 'SD';
 
         $material = Material::create([
-            'guru_id'   => $request->user()->id,
-            'jenjang'   => $jenjang,
-            'judul'     => $data['judul'],
+            'guru_id' => $request->user()->id,
+            'jenjang' => $jenjang,
+            'judul' => $data['judul'],
             'deskripsi' => $data['deskripsi'] ?? null,
         ]);
 
@@ -70,23 +70,23 @@ class MaterialController extends Controller
                 ['material_id' => $material->id],
                 $result
             ));
-        } else if ($request->filled('attachment')) {
+        } elseif ($request->filled('attachment')) {
             $attachmentData = $request->input('attachment');
             if (str_starts_with($attachmentData, 'data:')) {
                 MaterialAttachment::create([
-                    'material_id'  => $material->id,
-                    'file_path'    => null,
-                    'file_base64'  => $attachmentData,
+                    'material_id' => $material->id,
+                    'file_path' => null,
+                    'file_base64' => $attachmentData,
                     'storage_type' => 'base64',
-                    'mime_type'    => explode(';', explode(':', $attachmentData)[1])[0] ?? 'application/octet-stream',
+                    'mime_type' => explode(';', explode(':', $attachmentData)[1])[0] ?? 'application/octet-stream',
                 ]);
-            } else if (filter_var($attachmentData, FILTER_VALIDATE_URL)) {
+            } elseif (filter_var($attachmentData, FILTER_VALIDATE_URL)) {
                 MaterialAttachment::create([
-                    'material_id'  => $material->id,
-                    'file_path'    => $attachmentData,
-                    'file_base64'  => null,
+                    'material_id' => $material->id,
+                    'file_path' => $attachmentData,
+                    'file_base64' => null,
                     'storage_type' => 'storage',
-                    'mime_type'    => 'application/octet-stream',
+                    'mime_type' => 'application/octet-stream',
                 ]);
             }
         }
@@ -104,7 +104,7 @@ class MaterialController extends Controller
         $this->authorizeGuru($request, $material->guru_id);
 
         $data = $request->validate([
-            'judul'     => 'sometimes|required|string|max:255',
+            'judul' => 'sometimes|required|string|max:255',
             'deskripsi' => 'nullable|string',
         ]);
 

@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -14,7 +13,7 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $data = $request->validate([
-            'email'    => 'required|email',
+            'email' => 'required|email',
             'password' => 'required|string',
         ]);
 
@@ -35,7 +34,7 @@ class AuthController extends Controller
         $token = $user->createToken('sinaubareng')->plainTextToken;
 
         return response()->json([
-            'user'  => $user,
+            'user' => $user,
             'token' => $token,
         ]);
     }
@@ -43,25 +42,25 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $data = $request->validate([
-            'name'     => 'required|string|max:191',
-            'email'    => 'required|email|unique:users,email',
+            'name' => 'required|string|max:191',
+            'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
-            'jenjang'  => 'nullable|string|in:SD,SMP',
+            'jenjang' => 'nullable|string|in:SD,SMP',
         ]);
 
         $user = User::create([
-            'name'     => $data['name'],
-            'email'    => $data['email'],
+            'name' => $data['name'],
+            'email' => $data['email'],
             'password' => Hash::make($data['password']),
-            'role'     => 'siswa',
-            'jenjang'  => $data['jenjang'] ?? 'SD',
-            'status'   => 'active',
+            'role' => 'siswa',
+            'jenjang' => $data['jenjang'] ?? 'SD',
+            'status' => 'active',
         ]);
 
         $token = $user->createToken('sinaubareng')->plainTextToken;
 
         return response()->json([
-            'user'  => $user,
+            'user' => $user,
             'token' => $token,
         ], 201);
     }

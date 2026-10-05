@@ -10,6 +10,8 @@ class MaterialAttachment extends Model
         'material_id', 'file_path', 'file_base64', 'storage_type', 'mime_type',
     ];
 
+    protected $hidden = ['file_base64'];
+
     protected $appends = ['url'];
 
     public function material()
@@ -31,7 +33,8 @@ class MaterialAttachment extends Model
                 return $this->file_path;
             }
             $baseUrl = request()?->schemeAndHttpHost() ?: asset('/');
-            return rtrim($baseUrl, '/') . '/storage/' . $this->file_path;
+
+            return rtrim($baseUrl, '/').'/storage/'.$this->file_path;
         }
 
         return null;

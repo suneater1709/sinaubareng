@@ -18,17 +18,17 @@ class QuizController extends Controller
             if ($user->role === 'guru' && $user->jenjang) {
                 $query->where(function ($q) use ($user) {
                     $q->where('jenjang', $user->jenjang)
-                      ->orWhere('guru_id', $user->id);
+                        ->orWhere('guru_id', $user->id);
                 });
             } elseif ($user->role === 'siswa' && $user->jenjang) {
                 $query->where(function ($q) use ($user) {
                     $q->where('jenjang', $user->jenjang)
-                      ->orWhereNull('jenjang');
+                        ->orWhereNull('jenjang');
                 });
             }
         }
 
-        if ($request->has('jenjang') && !empty($request->input('jenjang'))) {
+        if ($request->has('jenjang') && ! empty($request->input('jenjang'))) {
             $query->where('jenjang', $request->input('jenjang'));
         }
 
@@ -40,10 +40,10 @@ class QuizController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'judul'        => 'required|string|max:255',
+            'judul' => 'required|string|max:255',
             'durasi_menit' => 'required|integer|min:1',
-            'tipe'         => 'nullable|string|max:100',
-            'jenjang'      => 'nullable|string|in:SD,SMP',
+            'tipe' => 'nullable|string|max:100',
+            'jenjang' => 'nullable|string|in:SD,SMP',
         ]);
 
         $jenjang = $data['jenjang'] ?? $request->user()->jenjang ?? 'SD';
@@ -68,9 +68,9 @@ class QuizController extends Controller
         $this->authorizeGuru($request, $quiz->guru_id);
 
         $data = $request->validate([
-            'judul'        => 'sometimes|required|string|max:255',
+            'judul' => 'sometimes|required|string|max:255',
             'durasi_menit' => 'sometimes|required|integer|min:1',
-            'tipe'         => 'nullable|string|max:100',
+            'tipe' => 'nullable|string|max:100',
         ]);
 
         $quiz->update($data);

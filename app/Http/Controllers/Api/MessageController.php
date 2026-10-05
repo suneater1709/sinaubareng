@@ -7,7 +7,6 @@ use App\Models\Message;
 use App\Models\Notification;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class MessageController extends Controller
@@ -27,10 +26,10 @@ class MessageController extends Controller
         if ($role === 'siswa') {
             // Siswa can only contact Gurus matching their jenjang (or all active gurus if jenjang matches)
             $contactsQuery->where('role', 'guru');
-            if (!empty($currentUser->jenjang)) {
+            if (! empty($currentUser->jenjang)) {
                 $contactsQuery->where(function ($q) use ($currentUser) {
                     $q->where('jenjang', $currentUser->jenjang)
-                      ->orWhereNull('jenjang');
+                        ->orWhereNull('jenjang');
                 });
             }
         } elseif ($role === 'guru') {
@@ -39,10 +38,10 @@ class MessageController extends Controller
                 $q->where('role', 'admin');
                 $q->orWhere(function ($sub) use ($currentUser) {
                     $sub->where('role', 'siswa');
-                    if (!empty($currentUser->jenjang)) {
+                    if (! empty($currentUser->jenjang)) {
                         $sub->where(function ($j) use ($currentUser) {
                             $j->where('jenjang', $currentUser->jenjang)
-                              ->orWhereNull('jenjang');
+                                ->orWhereNull('jenjang');
                         });
                     }
                 });
@@ -54,18 +53,42 @@ class MessageController extends Controller
 
         $contacts = $contactsQuery->select(['id', 'name', 'email', 'role', 'jenjang'])->get();
 
-        // Attach last message and unread count for each contact
-        $results = $contacts->map(function ($contact) use ($currentUser) {
-            $lastMessage = Message::where(function ($q) use ($currentUser, $contact) {
-                $q->where('sender_id', $currentUser->id)->where('receiver_id', $contact->id);
-            })->orWhere(function ($q) use ($currentUser, $contact) {
-                $q->where('sender_id', $contact->id)->where('receiver_id', $currentUser->id);
-            })->latest()->first();
+        if ($contacts->isEmpty()) {
+            return response()->json([]);
+        }
 
-            $unreadCount = Message::where('sender_id', $contact->id)
-                ->where('receiver_id', $currentUser->id)
-                ->where('is_read', false)
-                ->count();
+        $contactIds = $contacts->pluck('id');
+
+        // 1. Unread counts grouped by sender_id in ONE query
+        $unreadCounts = Message::where('receiver_id', $currentUser->id)
+            ->whereIn('sender_id', $contactIds)
+            ->where('is_read', false)
+            ->groupBy('sender_id')
+            ->selectRaw('sender_id, count(*) as unread_total')
+            ->pluck('unread_total', 'sender_id');
+
+        // 2. Fetch recent messages involving current user and contacts in ONE query
+        $allRecentMessages = Message::where(function ($q) use ($currentUser, $contactIds) {
+            $q->where('sender_id', $currentUser->id)->whereIn('receiver_id', $contactIds);
+        })->orWhere(function ($q) use ($currentUser, $contactIds) {
+            $q->where('receiver_id', $currentUser->id)->whereIn('sender_id', $contactIds);
+        })
+            ->select(['id', 'sender_id', 'receiver_id', 'content', 'created_at'])
+            ->orderBy('id', 'desc')
+            ->get();
+
+        $latestMessagesByContact = [];
+        foreach ($allRecentMessages as $msg) {
+            $otherId = ($msg->sender_id === $currentUser->id) ? $msg->receiver_id : $msg->sender_id;
+            if (! isset($latestMessagesByContact[$otherId])) {
+                $latestMessagesByContact[$otherId] = $msg;
+            }
+        }
+
+        // Attach last message and unread count for each contact in-memory
+        $results = $contacts->map(function ($contact) use ($currentUser, $unreadCounts, $latestMessagesByContact) {
+            $lastMessage = $latestMessagesByContact[$contact->id] ?? null;
+            $unreadCount = (int) ($unreadCounts[$contact->id] ?? 0);
 
             return [
                 'id' => $contact->id,
@@ -84,11 +107,12 @@ class MessageController extends Controller
 
         // Sort by most recent message or name
         $sorted = $results->sort(function ($a, $b) {
-            $timeA = $a['last_message'] ? strtotime($a['last_message']['created_at']) : 0;
-            $timeB = $b['last_message'] ? strtotime($b['last_message']['created_at']) : 0;
+            $timeA = $a['last_message'] ? strtotime((string) $a['last_message']['created_at']) : 0;
+            $timeB = $b['last_message'] ? strtotime((string) $b['last_message']['created_at']) : 0;
             if ($timeA === $timeB) {
                 return strcmp($a['name'], $b['name']);
             }
+
             return $timeB <=> $timeA;
         })->values();
 
@@ -108,8 +132,8 @@ class MessageController extends Controller
         })->orWhere(function ($q) use ($currentUser, $otherUserId) {
             $q->where('sender_id', $otherUserId)->where('receiver_id', $currentUser->id);
         })
-        ->orderBy('created_at', 'asc')
-        ->get();
+            ->orderBy('created_at', 'asc')
+            ->get();
 
         // Mark received messages as read
         Message::where('sender_id', $otherUserId)
@@ -137,7 +161,7 @@ class MessageController extends Controller
         $currentUser = $request->user();
         $data = $request->validate([
             'receiver_id' => 'required|exists:users,id',
-            'content'     => 'required|string|max:2000',
+            'content' => 'required|string|max:2000',
         ]);
 
         $receiver = User::findOrFail($data['receiver_id']);
@@ -172,21 +196,21 @@ class MessageController extends Controller
         }
 
         $message = Message::create([
-            'sender_id'     => $currentUser->id,
-            'sender_role'   => $senderRole,
-            'receiver_id'   => $receiver->id,
+            'sender_id' => $currentUser->id,
+            'sender_role' => $senderRole,
+            'receiver_id' => $receiver->id,
             'receiver_role' => $receiverRole,
-            'content'       => $data['content'],
-            'is_read'       => false,
+            'content' => $data['content'],
+            'is_read' => false,
         ]);
 
         // Automatically create in-app notification for receiver
         Notification::create([
             'user_id' => $receiver->id,
-            'title'   => "Pesan baru dari {$currentUser->name}",
-            'message' => mb_substr($data['content'], 0, 80) . (mb_strlen($data['content']) > 80 ? '...' : ''),
-            'type'    => 'message',
-            'link'    => '/messages',
+            'title' => "Pesan baru dari {$currentUser->name}",
+            'message' => mb_substr($data['content'], 0, 80).(mb_strlen($data['content']) > 80 ? '...' : ''),
+            'type' => 'message',
+            'link' => '/messages',
             'is_read' => false,
         ]);
 

@@ -196,9 +196,9 @@ class DatabaseSeeder extends Seeder
         );
 
         // 9. Default Site Settings
-        SiteSetting::set('hero_title', "Cerdaskan Si Kecil dengan Adab & Prestasi");
-        SiteSetting::set('hero_subtitle', "Fokus pada penguasaan Matematika & Bahasa Inggris untuk SD-SMP dengan lingkungan belajar yang islami, suportif, dan menyenangkan.");
-        SiteSetting::set('hero_image_url', "https://images.unsplash.com/photo-1577896851231-70ef18881754?q=80&w=2070&auto=format&fit=crop");
-        SiteSetting::set('active_students_badge', "500+");
+        SiteSetting::set('hero_title', 'Cerdaskan Si Kecil dengan Adab & Prestasi');
+        SiteSetting::set('hero_subtitle', 'Fokus pada penguasaan Matematika & Bahasa Inggris untuk SD-SMP dengan lingkungan belajar yang islami, suportif, dan menyenangkan.');
+        SiteSetting::set('hero_image_url', 'https://images.unsplash.com/photo-1577896851231-70ef18881754?q=80&w=2070&auto=format&fit=crop');
+        SiteSetting::set('active_students_badge', '500+');
     }
 }
